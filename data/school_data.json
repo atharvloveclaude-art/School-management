@@ -1,0 +1,1024 @@
+{
+  "classes": [
+    {
+      "id": "12-A",
+      "academicYear": "2026-27",
+      "section": "A",
+      "roomDefault": "204",
+      "grade": "12"
+    },
+    {
+      "academicYear": "2026-27",
+      "grade": "12",
+      "roomDefault": "301",
+      "id": "12-B",
+      "section": "B"
+    },
+    {
+      "id": "11-A",
+      "section": "A",
+      "academicYear": "2026-27",
+      "grade": "11",
+      "roomDefault": "102"
+    },
+    {
+      "grade": "11",
+      "id": "11-B",
+      "academicYear": "2026-27",
+      "roomDefault": "205",
+      "section": "B"
+    },
+    {
+      "academicYear": "2026-27",
+      "id": "10-A",
+      "roomDefault": "204",
+      "section": "A",
+      "grade": "10"
+    },
+    {
+      "section": "C",
+      "id": "10-C",
+      "roomDefault": "301",
+      "grade": "10",
+      "academicYear": "2026-27"
+    }
+  ],
+  "subjects": [
+    {
+      "department": "Science",
+      "name": "Physics",
+      "id": "PHY"
+    },
+    {
+      "department": "Mathematics",
+      "id": "MAT",
+      "name": "Mathematics"
+    },
+    {
+      "id": "CHEM",
+      "department": "Science",
+      "name": "Chemistry"
+    },
+    {
+      "department": "Science",
+      "name": "Biology",
+      "id": "BIO"
+    },
+    {
+      "name": "Computer Science",
+      "department": "Science",
+      "id": "CS"
+    },
+    {
+      "department": "Languages",
+      "id": "ENG",
+      "name": "English"
+    },
+    {
+      "department": "Social Studies",
+      "name": "Social Studies",
+      "id": "SOC"
+    },
+    {
+      "name": "Physical Education",
+      "id": "PE",
+      "department": "Sports"
+    }
+  ],
+  "rooms": [
+    {
+      "id": "204",
+      "type": "Classroom",
+      "capacity": 40
+    },
+    {
+      "capacity": 35,
+      "type": "Laboratory",
+      "id": "205"
+    },
+    {
+      "capacity": 50,
+      "id": "301",
+      "type": "Classroom"
+    },
+    {
+      "id": "102",
+      "capacity": 40,
+      "type": "Classroom"
+    },
+    {
+      "id": "LAB-1",
+      "type": "Computer Lab",
+      "capacity": 30
+    },
+    {
+      "capacity": 35,
+      "id": "BIO-LAB",
+      "type": "Biology Lab"
+    }
+  ],
+  "substitutions": [
+    {
+      "assignedSubstituteId": "T004",
+      "id": "sub-abs-022885-1",
+      "subjectId": "PE",
+      "date": "2026-08-17",
+      "assignedSubstituteName": "Mrs Verma",
+      "period": 5,
+      "assignedAt": "2026-08-18T04:11:35.132Z",
+      "classId": "11-B",
+      "absenceId": "abs-022885",
+      "assignedReason": "Auto: Free Period 5 • Light daily load (3/8 periods)",
+      "roomId": "205",
+      "day": "Monday",
+      "subjectName": "Physical Education",
+      "originalTeacherName": "Coach Rawat",
+      "originalTeacherId": "T008",
+      "status": "Assigned"
+    },
+    {
+      "assignedReason": "Auto: Free Period 8 • Moderate load (5/8 periods)",
+      "assignedAt": "2026-08-18T04:07:03.925Z",
+      "subjectId": "PE",
+      "status": "Assigned",
+      "classId": "12-A",
+      "absenceId": "abs-022885",
+      "roomId": "204",
+      "day": "Monday",
+      "originalTeacherId": "T008",
+      "assignedSubstituteId": "T005",
+      "date": "2026-08-17",
+      "period": 8,
+      "id": "sub-abs-022885-2",
+      "assignedSubstituteName": "Mr Gupta",
+      "subjectName": "Physical Education",
+      "originalTeacherName": "Coach Rawat"
+    },
+    {
+      "assignedReason": "Auto: Free Period 8 • 3 consecutive periods (will need rest after)",
+      "status": "Assigned",
+      "assignedAt": "2026-08-18T04:07:03.925Z",
+      "originalTeacherName": "Coach Rawat",
+      "roomId": "102",
+      "id": "sub-abs-022885-3",
+      "day": "Monday",
+      "assignedSubstituteId": "T002",
+      "assignedSubstituteName": "Mrs Gupta",
+      "period": 8,
+      "absenceId": "abs-022885",
+      "date": "2026-08-17",
+      "classId": "10-A",
+      "subjectId": "PE",
+      "subjectName": "Physical Education",
+      "originalTeacherId": "T008"
+    },
+    {
+      "assignedAt": "2026-08-18T04:06:46.884Z",
+      "period": 1,
+      "assignedReason": "Auto: Subject Specialist (Mathematics) • Moderate load (5/8 periods)",
+      "day": "Monday",
+      "id": "sub-abs-002324-1",
+      "originalTeacherName": "Mr Das",
+      "assignedSubstituteName": "Mrs Gupta",
+      "classId": "11-B",
+      "date": "2026-08-17",
+      "absenceId": "abs-002324",
+      "status": "Assigned",
+      "originalTeacherId": "T010",
+      "subjectName": "Mathematics",
+      "roomId": "205",
+      "assignedSubstituteId": "T002",
+      "subjectId": "MAT"
+    },
+    {
+      "absenceId": "abs-310965",
+      "id": "sub-abs-310965-1",
+      "subjectId": "CS",
+      "originalTeacherId": "T006",
+      "period": 2,
+      "date": "2026-08-17",
+      "classId": "11-B",
+      "roomId": "LAB-1",
+      "subjectName": "Computer Science",
+      "day": "Monday",
+      "status": "Assigned",
+      "assignedAt": "2026-08-18T03:57:23.229Z",
+      "assignedSubstituteId": "T005",
+      "assignedSubstituteName": "Mr Gupta",
+      "assignedReason": "Auto: Science Department Faculty • Light daily load (3/8 periods)",
+      "originalTeacherName": "Ms Patel"
+    },
+    {
+      "subjectName": "Computer Science",
+      "assignedSubstituteId": "T010",
+      "originalTeacherId": "T006",
+      "period": 4,
+      "assignedReason": "Auto: Free Period 4 • Optimal rest interval • Light daily load (2/8 periods)",
+      "assignedAt": "2026-08-18T03:57:23.229Z",
+      "day": "Monday",
+      "id": "sub-abs-310965-2",
+      "classId": "10-A",
+      "date": "2026-08-17",
+      "assignedSubstituteName": "Mr Das",
+      "status": "Assigned",
+      "absenceId": "abs-310965",
+      "originalTeacherName": "Ms Patel",
+      "roomId": "LAB-1",
+      "subjectId": "CS"
+    },
+    {
+      "subjectName": "Computer Science",
+      "id": "sub-abs-310965-3",
+      "subjectId": "CS",
+      "date": "2026-08-17",
+      "period": 5,
+      "assignedAt": "2026-08-18T03:57:23.229Z",
+      "assignedReason": "Auto: Science Department Faculty",
+      "absenceId": "abs-310965",
+      "roomId": "LAB-1",
+      "assignedSubstituteName": "Mr Gupta",
+      "classId": "12-A",
+      "originalTeacherName": "Ms Patel",
+      "status": "Assigned",
+      "assignedSubstituteId": "T005",
+      "day": "Monday",
+      "originalTeacherId": "T006"
+    },
+    {
+      "assignedSubstituteName": "Mrs Verma",
+      "originalTeacherId": "T001",
+      "status": "Assigned",
+      "roomId": "204",
+      "id": "sub-1",
+      "assignedSubstituteId": "T004",
+      "assignedReason": "Same subject specialist (Physics)",
+      "day": "Monday",
+      "classId": "12-A",
+      "subjectName": "Physics",
+      "absenceId": "abs-1",
+      "period": 1,
+      "date": "2026-08-17",
+      "originalTeacherName": "Mr Sharma",
+      "subjectId": "PHY",
+      "assignedAt": "2026-08-17T07:15:00Z"
+    },
+    {
+      "roomId": "204",
+      "subjectId": "PHY",
+      "subjectName": "Physics",
+      "classId": "12-A",
+      "originalTeacherName": "Mr Sharma",
+      "status": "Assigned",
+      "assignedAt": "2026-08-17T07:15:00Z",
+      "absenceId": "abs-1",
+      "assignedSubstituteId": "T004",
+      "originalTeacherId": "T001",
+      "date": "2026-08-17",
+      "assignedSubstituteName": "Mrs Verma",
+      "id": "sub-2",
+      "day": "Monday",
+      "period": 2,
+      "assignedReason": "Same subject specialist (Physics)"
+    },
+    {
+      "subjectName": "Physics",
+      "assignedReason": "Science department cover with rest period protection",
+      "classId": "11-B",
+      "period": 3,
+      "day": "Monday",
+      "roomId": "205",
+      "id": "sub-3",
+      "assignedAt": "2026-08-17T07:15:00Z",
+      "absenceId": "abs-1",
+      "originalTeacherName": "Mr Sharma",
+      "assignedSubstituteId": "T005",
+      "originalTeacherId": "T001",
+      "status": "Assigned",
+      "date": "2026-08-17",
+      "assignedSubstituteName": "Mr Gupta",
+      "subjectId": "PHY"
+    }
+  ],
+  "teachers": [
+    {
+      "maxPeriodsPerDay": 6,
+      "primarySubject": "Physics",
+      "department": "Physics",
+      "email": "sharma@school.edu",
+      "id": "T001",
+      "anonymousCode": "T-PHY-01",
+      "phone": "9811234567",
+      "name": "Mr Sharma"
+    },
+    {
+      "name": "Mrs Gupta",
+      "maxPeriodsPerDay": 6,
+      "email": "gupta@school.edu",
+      "id": "T002",
+      "anonymousCode": "T-MAT-01",
+      "phone": "9711234567",
+      "department": "Mathematics",
+      "primarySubject": "Mathematics"
+    },
+    {
+      "id": "T003",
+      "phone": "9911234567",
+      "anonymousCode": "T-CHEM-01",
+      "primarySubject": "Chemistry",
+      "email": "singh@school.edu",
+      "name": "Mr Singh",
+      "department": "Chemistry",
+      "maxPeriodsPerDay": 6
+    },
+    {
+      "email": "verma@school.edu",
+      "department": "Physics",
+      "id": "T004",
+      "maxPeriodsPerDay": 6,
+      "anonymousCode": "T-PHY-02",
+      "phone": "9822334455",
+      "name": "Mrs Verma",
+      "primarySubject": "Physics"
+    },
+    {
+      "email": "mr.gupta@school.edu",
+      "department": "Science",
+      "anonymousCode": "T-BIO-01",
+      "maxPeriodsPerDay": 6,
+      "id": "T005",
+      "primarySubject": "Biology",
+      "name": "Mr Gupta",
+      "phone": "9733445566"
+    },
+    {
+      "department": "Computer Science",
+      "maxPeriodsPerDay": 6,
+      "phone": "9844556677",
+      "name": "Ms Patel",
+      "email": "patel@school.edu",
+      "primarySubject": "Computer Science",
+      "anonymousCode": "T-CS-01",
+      "id": "T006"
+    },
+    {
+      "department": "English",
+      "maxPeriodsPerDay": 6,
+      "name": "Mr Kumar",
+      "primarySubject": "English",
+      "email": "kumar@school.edu",
+      "phone": "9855667788",
+      "id": "T007",
+      "anonymousCode": "T-ENG-01"
+    },
+    {
+      "department": "Physical Education",
+      "name": "Coach Rawat",
+      "phone": "9866778899",
+      "id": "T008",
+      "anonymousCode": "T-PE-01",
+      "primarySubject": "Physical Education",
+      "email": "rawat@school.edu",
+      "maxPeriodsPerDay": 6
+    },
+    {
+      "email": "iyer@school.edu",
+      "department": "Social Studies",
+      "primarySubject": "Social Studies",
+      "anonymousCode": "T-SOC-01",
+      "maxPeriodsPerDay": 6,
+      "id": "T009",
+      "name": "Mrs Iyer",
+      "phone": "9877889900"
+    },
+    {
+      "primarySubject": "Mathematics",
+      "name": "Mr Das",
+      "anonymousCode": "T-MAT-02",
+      "email": "das@school.edu",
+      "department": "Mathematics",
+      "id": "T010",
+      "phone": "9888990011",
+      "maxPeriodsPerDay": 6
+    }
+  ],
+  "absences": [
+    {
+      "affectedPeriodsCount": 3,
+      "createdAt": "2026-08-18T04:07:02.885Z",
+      "id": "abs-022885",
+      "date": "2026-08-17",
+      "dayOfWeek": "Monday",
+      "teacherId": "T008",
+      "teacherName": "Coach Rawat",
+      "reason": "Sick leave"
+    },
+    {
+      "id": "abs-002324",
+      "date": "2026-08-17",
+      "reason": "Sick leave",
+      "createdAt": "2026-08-18T04:06:42.324Z",
+      "teacherId": "T010",
+      "dayOfWeek": "Monday",
+      "teacherName": "Mr Das",
+      "affectedPeriodsCount": 1
+    },
+    {
+      "dayOfWeek": "Monday",
+      "teacherId": "T006",
+      "date": "2026-08-17",
+      "createdAt": "2026-08-18T03:55:10.965Z",
+      "reason": "Casual leave",
+      "affectedPeriodsCount": 3,
+      "id": "abs-310965",
+      "teacherName": "Ms Patel"
+    },
+    {
+      "date": "2026-08-17",
+      "dayOfWeek": "Monday",
+      "teacherId": "T001",
+      "createdAt": "2026-08-17T07:00:00Z",
+      "affectedPeriodsCount": 3,
+      "id": "abs-1",
+      "reason": "Sick leave",
+      "teacherName": "Mr Sharma"
+    }
+  ],
+  "timetables": [
+    {
+      "subjectId": "PHY",
+      "roomId": "204",
+      "teacherId": "T001",
+      "period": 1,
+      "day": "Monday",
+      "classId": "12-A",
+      "id": "tt-12a-mon-1"
+    },
+    {
+      "teacherId": "T001",
+      "classId": "12-A",
+      "day": "Monday",
+      "period": 2,
+      "subjectId": "PHY",
+      "id": "tt-12a-mon-2",
+      "roomId": "204"
+    },
+    {
+      "period": 3,
+      "subjectId": "ENG",
+      "teacherId": "T007",
+      "day": "Monday",
+      "classId": "12-A",
+      "id": "tt-12a-mon-3",
+      "roomId": "204"
+    },
+    {
+      "classId": "12-A",
+      "teacherId": "T003",
+      "id": "tt-12a-mon-4",
+      "subjectId": "CHEM",
+      "period": 4,
+      "roomId": "205",
+      "day": "Monday"
+    },
+    {
+      "roomId": "LAB-1",
+      "subjectId": "CS",
+      "classId": "12-A",
+      "teacherId": "T006",
+      "day": "Monday",
+      "id": "tt-12a-mon-5",
+      "period": 5
+    },
+    {
+      "period": 6,
+      "day": "Monday",
+      "teacherId": "T002",
+      "classId": "12-A",
+      "subjectId": "MAT",
+      "roomId": "204",
+      "id": "tt-12a-mon-6"
+    },
+    {
+      "classId": "12-A",
+      "period": 7,
+      "day": "Monday",
+      "teacherId": "T005",
+      "roomId": "BIO-LAB",
+      "subjectId": "BIO",
+      "id": "tt-12a-mon-7"
+    },
+    {
+      "teacherId": "T008",
+      "classId": "12-A",
+      "period": 8,
+      "subjectId": "PE",
+      "id": "tt-12a-mon-8",
+      "roomId": "204",
+      "day": "Monday"
+    },
+    {
+      "roomId": "204",
+      "id": "tt-12a-tue-1",
+      "period": 1,
+      "teacherId": "T002",
+      "day": "Tuesday",
+      "classId": "12-A",
+      "subjectId": "MAT"
+    },
+    {
+      "period": 2,
+      "teacherId": "T001",
+      "id": "tt-12a-tue-2",
+      "subjectId": "PHY",
+      "classId": "12-A",
+      "day": "Tuesday",
+      "roomId": "204"
+    },
+    {
+      "day": "Tuesday",
+      "roomId": "LAB-1",
+      "classId": "12-A",
+      "teacherId": "T006",
+      "subjectId": "CS",
+      "period": 3,
+      "id": "tt-12a-tue-3"
+    },
+    {
+      "subjectId": "ENG",
+      "period": 4,
+      "day": "Tuesday",
+      "teacherId": "T007",
+      "id": "tt-12a-tue-4",
+      "classId": "12-A",
+      "roomId": "204"
+    },
+    {
+      "period": 5,
+      "day": "Tuesday",
+      "classId": "12-A",
+      "subjectId": "PE",
+      "id": "tt-12a-tue-5",
+      "roomId": "204",
+      "teacherId": "T008"
+    },
+    {
+      "subjectId": "CHEM",
+      "teacherId": "T003",
+      "day": "Tuesday",
+      "roomId": "205",
+      "id": "tt-12a-tue-6",
+      "classId": "12-A",
+      "period": 6
+    },
+    {
+      "classId": "12-A",
+      "period": 7,
+      "day": "Tuesday",
+      "roomId": "204",
+      "teacherId": "T009",
+      "id": "tt-12a-tue-7",
+      "subjectId": "SOC"
+    },
+    {
+      "teacherId": "T010",
+      "day": "Tuesday",
+      "roomId": "204",
+      "subjectId": "MAT",
+      "classId": "12-A",
+      "period": 8,
+      "id": "tt-12a-tue-8"
+    },
+    {
+      "id": "tt-12a-wed-1",
+      "roomId": "205",
+      "subjectId": "CHEM",
+      "teacherId": "T003",
+      "classId": "12-A",
+      "day": "Wednesday",
+      "period": 1
+    },
+    {
+      "id": "tt-12a-wed-2",
+      "teacherId": "T002",
+      "subjectId": "MAT",
+      "period": 2,
+      "day": "Wednesday",
+      "classId": "12-A",
+      "roomId": "204"
+    },
+    {
+      "classId": "12-A",
+      "id": "tt-12a-wed-3",
+      "day": "Wednesday",
+      "period": 3,
+      "subjectId": "PHY",
+      "roomId": "204",
+      "teacherId": "T001"
+    },
+    {
+      "period": 4,
+      "day": "Wednesday",
+      "classId": "12-A",
+      "subjectId": "CS",
+      "teacherId": "T006",
+      "roomId": "LAB-1",
+      "id": "tt-12a-wed-4"
+    },
+    {
+      "id": "tt-12a-wed-5",
+      "teacherId": "T007",
+      "period": 5,
+      "subjectId": "ENG",
+      "day": "Wednesday",
+      "classId": "12-A",
+      "roomId": "204"
+    },
+    {
+      "roomId": "BIO-LAB",
+      "day": "Wednesday",
+      "id": "tt-12a-wed-6",
+      "classId": "12-A",
+      "subjectId": "BIO",
+      "period": 6,
+      "teacherId": "T005"
+    },
+    {
+      "roomId": "204",
+      "id": "tt-12a-wed-7",
+      "teacherId": "T004",
+      "classId": "12-A",
+      "period": 7,
+      "day": "Wednesday",
+      "subjectId": "PHY"
+    },
+    {
+      "day": "Wednesday",
+      "period": 8,
+      "roomId": "204",
+      "subjectId": "PE",
+      "classId": "12-A",
+      "teacherId": "T008",
+      "id": "tt-12a-wed-8"
+    },
+    {
+      "classId": "12-A",
+      "period": 1,
+      "roomId": "LAB-1",
+      "subjectId": "CS",
+      "day": "Thursday",
+      "teacherId": "T006",
+      "id": "tt-12a-thu-1"
+    },
+    {
+      "id": "tt-12a-thu-2",
+      "period": 2,
+      "day": "Thursday",
+      "classId": "12-A",
+      "roomId": "204",
+      "teacherId": "T001",
+      "subjectId": "PHY"
+    },
+    {
+      "day": "Thursday",
+      "roomId": "204",
+      "period": 3,
+      "classId": "12-A",
+      "subjectId": "MAT",
+      "id": "tt-12a-thu-3",
+      "teacherId": "T002"
+    },
+    {
+      "teacherId": "T007",
+      "classId": "12-A",
+      "id": "tt-12a-thu-4",
+      "subjectId": "ENG",
+      "roomId": "204",
+      "period": 4,
+      "day": "Thursday"
+    },
+    {
+      "day": "Thursday",
+      "classId": "12-A",
+      "period": 5,
+      "teacherId": "T003",
+      "id": "tt-12a-thu-5",
+      "subjectId": "CHEM",
+      "roomId": "205"
+    },
+    {
+      "period": 6,
+      "roomId": "204",
+      "day": "Thursday",
+      "classId": "12-A",
+      "subjectId": "SOC",
+      "id": "tt-12a-thu-6",
+      "teacherId": "T009"
+    },
+    {
+      "teacherId": "T005",
+      "roomId": "BIO-LAB",
+      "subjectId": "BIO",
+      "id": "tt-12a-thu-7",
+      "period": 7,
+      "day": "Thursday",
+      "classId": "12-A"
+    },
+    {
+      "roomId": "204",
+      "id": "tt-12a-thu-8",
+      "day": "Thursday",
+      "teacherId": "T010",
+      "classId": "12-A",
+      "subjectId": "MAT",
+      "period": 8
+    },
+    {
+      "roomId": "204",
+      "day": "Friday",
+      "id": "tt-12a-fri-1",
+      "teacherId": "T001",
+      "period": 1,
+      "subjectId": "PHY",
+      "classId": "12-A"
+    },
+    {
+      "classId": "12-A",
+      "subjectId": "MAT",
+      "teacherId": "T002",
+      "id": "tt-12a-fri-2",
+      "period": 2,
+      "roomId": "204",
+      "day": "Friday"
+    },
+    {
+      "roomId": "205",
+      "subjectId": "CHEM",
+      "classId": "12-A",
+      "teacherId": "T003",
+      "id": "tt-12a-fri-3",
+      "day": "Friday",
+      "period": 3
+    },
+    {
+      "roomId": "204",
+      "subjectId": "MAT",
+      "classId": "12-A",
+      "teacherId": "T002",
+      "id": "tt-12a-fri-4",
+      "day": "Friday",
+      "period": 4
+    },
+    {
+      "roomId": "204",
+      "day": "Friday",
+      "subjectId": "ENG",
+      "teacherId": "T007",
+      "classId": "12-A",
+      "id": "tt-12a-fri-5",
+      "period": 5
+    },
+    {
+      "period": 6,
+      "day": "Friday",
+      "id": "tt-12a-fri-6",
+      "subjectId": "PE",
+      "classId": "12-A",
+      "teacherId": "T008",
+      "roomId": "204"
+    },
+    {
+      "period": 7,
+      "classId": "12-A",
+      "day": "Friday",
+      "subjectId": "SOC",
+      "id": "tt-12a-fri-7",
+      "teacherId": "T009",
+      "roomId": "204"
+    },
+    {
+      "roomId": "BIO-LAB",
+      "day": "Friday",
+      "teacherId": "T005",
+      "period": 8,
+      "classId": "12-A",
+      "id": "tt-12a-fri-8",
+      "subjectId": "BIO"
+    },
+    {
+      "id": "tt-12a-sat-1",
+      "subjectId": "MAT",
+      "period": 1,
+      "teacherId": "T002",
+      "day": "Saturday",
+      "classId": "12-A",
+      "roomId": "204"
+    },
+    {
+      "day": "Saturday",
+      "subjectId": "PHY",
+      "classId": "12-A",
+      "period": 2,
+      "teacherId": "T001",
+      "roomId": "204",
+      "id": "tt-12a-sat-2"
+    },
+    {
+      "classId": "12-A",
+      "period": 3,
+      "subjectId": "CHEM",
+      "id": "tt-12a-sat-3",
+      "day": "Saturday",
+      "roomId": "205",
+      "teacherId": "T003"
+    },
+    {
+      "roomId": "204",
+      "day": "Saturday",
+      "classId": "12-A",
+      "id": "tt-12a-sat-4",
+      "teacherId": "T007",
+      "period": 4,
+      "subjectId": "ENG"
+    },
+    {
+      "classId": "12-A",
+      "period": 5,
+      "id": "tt-12a-sat-5",
+      "day": "Saturday",
+      "subjectId": "CS",
+      "teacherId": "T006",
+      "roomId": "LAB-1"
+    },
+    {
+      "roomId": "204",
+      "subjectId": "SOC",
+      "id": "tt-12a-sat-6",
+      "teacherId": "T009",
+      "day": "Saturday",
+      "period": 6,
+      "classId": "12-A"
+    },
+    {
+      "day": "Saturday",
+      "roomId": "BIO-LAB",
+      "teacherId": "T005",
+      "period": 7,
+      "id": "tt-12a-sat-7",
+      "classId": "12-A",
+      "subjectId": "BIO"
+    },
+    {
+      "teacherId": "T008",
+      "period": 8,
+      "subjectId": "PE",
+      "day": "Saturday",
+      "classId": "12-A",
+      "id": "tt-12a-sat-8",
+      "roomId": "204"
+    },
+    {
+      "id": "tt-11b-mon-1",
+      "roomId": "205",
+      "classId": "11-B",
+      "day": "Monday",
+      "period": 1,
+      "teacherId": "T010",
+      "subjectId": "MAT"
+    },
+    {
+      "period": 2,
+      "id": "tt-11b-mon-2",
+      "classId": "11-B",
+      "subjectId": "CS",
+      "day": "Monday",
+      "roomId": "LAB-1",
+      "teacherId": "T006"
+    },
+    {
+      "id": "tt-11b-mon-3",
+      "period": 3,
+      "teacherId": "T001",
+      "roomId": "205",
+      "classId": "11-B",
+      "day": "Monday",
+      "subjectId": "PHY"
+    },
+    {
+      "subjectId": "MAT",
+      "id": "tt-11b-mon-4",
+      "teacherId": "T002",
+      "day": "Monday",
+      "period": 4,
+      "classId": "11-B",
+      "roomId": "205"
+    },
+    {
+      "classId": "11-B",
+      "period": 5,
+      "id": "tt-11b-mon-5",
+      "subjectId": "PE",
+      "teacherId": "T008",
+      "day": "Monday",
+      "roomId": "205"
+    },
+    {
+      "subjectId": "CHEM",
+      "id": "tt-11b-mon-6",
+      "roomId": "205",
+      "teacherId": "T003",
+      "day": "Monday",
+      "classId": "11-B",
+      "period": 6
+    },
+    {
+      "roomId": "205",
+      "period": 7,
+      "id": "tt-11b-mon-7",
+      "day": "Monday",
+      "teacherId": "T007",
+      "subjectId": "ENG",
+      "classId": "11-B"
+    },
+    {
+      "id": "tt-11b-mon-8",
+      "subjectId": "SOC",
+      "period": 8,
+      "day": "Monday",
+      "teacherId": "T009",
+      "classId": "11-B",
+      "roomId": "205"
+    },
+    {
+      "roomId": "102",
+      "teacherId": "T007",
+      "subjectId": "ENG",
+      "id": "tt-10a-mon-1",
+      "day": "Monday",
+      "classId": "10-A",
+      "period": 1
+    },
+    {
+      "id": "tt-10a-mon-2",
+      "roomId": "102",
+      "day": "Monday",
+      "subjectId": "MAT",
+      "period": 2,
+      "classId": "10-A",
+      "teacherId": "T002"
+    },
+    {
+      "classId": "10-A",
+      "id": "tt-10a-mon-3",
+      "day": "Monday",
+      "period": 3,
+      "subjectId": "CHEM",
+      "roomId": "102",
+      "teacherId": "T003"
+    },
+    {
+      "period": 4,
+      "day": "Monday",
+      "subjectId": "CS",
+      "id": "tt-10a-mon-4",
+      "classId": "10-A",
+      "teacherId": "T006",
+      "roomId": "LAB-1"
+    },
+    {
+      "subjectId": "SOC",
+      "period": 5,
+      "id": "tt-10a-mon-5",
+      "day": "Monday",
+      "teacherId": "T009",
+      "classId": "10-A",
+      "roomId": "102"
+    },
+    {
+      "period": 6,
+      "classId": "10-A",
+      "subjectId": "PHY",
+      "teacherId": "T001",
+      "id": "tt-10a-mon-6",
+      "day": "Monday",
+      "roomId": "102"
+    },
+    {
+      "day": "Monday",
+      "period": 7,
+      "classId": "10-A",
+      "subjectId": "BIO",
+      "id": "tt-10a-mon-7",
+      "roomId": "BIO-LAB",
+      "teacherId": "T005"
+    },
+    {
+      "id": "tt-10a-mon-8",
+      "period": 8,
+      "roomId": "102",
+      "classId": "10-A",
+      "subjectId": "PE",
+      "day": "Monday",
+      "teacherId": "T008"
+    }
+  ]
+}

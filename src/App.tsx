@@ -1,0 +1,645 @@
+import React, { useState, useEffect } from 'react';
+import {
+  UserRole,
+  Teacher,
+  ClassItem,
+  Subject,
+  Room,
+  TimetableEntry,
+  Absence,
+  Substitution,
+  AffectedPeriod
+} from './types';
+import {
+  fetchFullAppData,
+  seedDatabase,
+  saveLocalData,
+  syncDocToFirestore,
+  deleteDocFromFirestore,
+  AppDataState
+} from './services/dataService';
+import {
+  findAffectedPeriods,
+  getDayOfWeekFromDate,
+  autoAssignSubstitutions
+} from './services/substitutionService';
+import { HeaderNav } from './components/HeaderNav';
+import { DailySubstituteDesk } from './components/DailySubstituteDesk';
+import { TimetableGrid } from './components/TimetableGrid';
+import { TimetableModal } from './components/TimetableModal';
+import { DirectorySetupView } from './components/DirectorySetupView';
+import { AssignSubstituteModal } from './components/AssignSubstituteModal';
+import { TeacherDashboardView } from './components/TeacherDashboardView';
+import { StudentDashboardView } from './components/StudentDashboardView';
+import { PrintSubstitutedTeachersModal } from './components/PrintSubstitutedTeachersModal';
+
+export default function App() {
+  const [role, setRole] = useState<UserRole>('admin');
+  const [currentTab, setCurrentTab] = useState<string>('substitutions');
+  const [isAnonymous, setIsAnonymous] = useState<boolean>(() => {
+    return localStorage.getItem('school_anon_mode') === 'true';
+  });
+
+  // Modal States
+  const [isPrintRosterOpen, setIsPrintRosterOpen] = useState<boolean>(false);
+  const [printRosterDate, setPrintRosterDate] = useState<string>('2026-08-17');
+  const [activeTimetableEntry, setActiveTimetableEntry] = useState<Partial<TimetableEntry> | null>(null);
+  const [isTimetableModalOpen, setIsTimetableModalOpen] = useState<boolean>(false);
+  const [activeAssignSub, setActiveAssignSub] = useState<Substitution | null>(null);
+
+  // Core App Data
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [timetables, setTimetables] = useState<TimetableEntry[]>([]);
+  const [absences, setAbsences] = useState<Absence[]>([]);
+  const [substitutions, setSubstitutions] = useState<Substitution[]>([]);
+
+  // Selected for teacher/student portals
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('T001');
+  const [selectedClassId, setSelectedClassId] = useState<string>('12-A');
+
+  // Notifications
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'info' | 'error'>('success');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Initialize data on mount
+  useEffect(() => {
+    async function loadData() {
+      setIsSyncing(true);
+      try {
+        const fullData = await fetchFullAppData();
+        setTeachers(fullData.teachers);
+        setClasses(fullData.classes);
+        setSubjects(fullData.subjects);
+        setRooms(fullData.rooms);
+        setTimetables(fullData.timetables);
+        setAbsences(fullData.absences);
+        setSubstitutions(fullData.substitutions);
+        if (fullData.teachers[0]) setSelectedTeacherId(fullData.teachers[0].id);
+        if (fullData.classes[0]) setSelectedClassId(fullData.classes[0].id);
+      } catch (e) {
+        console.error('Data initialization error:', e);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const showToast = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
+
+  const handleToggleAnonymous = () => {
+    const next = !isAnonymous;
+    setIsAnonymous(next);
+    localStorage.setItem('school_anon_mode', String(next));
+    showToast(next ? 'Anonymous mode enabled (Staff codes active).' : 'Standard mode enabled (Staff names active).');
+  };
+
+  const updateAppData = (changes: Partial<AppDataState>) => {
+    const nextState: AppDataState = {
+      teachers: changes.teachers || teachers,
+      classes: changes.classes || classes,
+      subjects: changes.subjects || subjects,
+      rooms: changes.rooms || rooms,
+      timetables: changes.timetables || timetables,
+      absences: changes.absences || absences,
+      substitutions: changes.substitutions || substitutions
+    };
+
+    if (changes.teachers) setTeachers(changes.teachers);
+    if (changes.classes) setClasses(changes.classes);
+    if (changes.subjects) setSubjects(changes.subjects);
+    if (changes.rooms) setRooms(changes.rooms);
+    if (changes.timetables) setTimetables(changes.timetables);
+    if (changes.absences) setAbsences(changes.absences);
+    if (changes.substitutions) setSubstitutions(changes.substitutions);
+
+    saveLocalData(nextState);
+  };
+
+  // Reset to default 8-period seed dataset
+  const handleResetData = async () => {
+    if (window.confirm('Reset application to default 8-period, 6-day timetable dataset? This will restore sample faculty and schedule.')) {
+      setIsSyncing(true);
+      await seedDatabase();
+      const freshData = await fetchFullAppData();
+      setTeachers(freshData.teachers);
+      setClasses(freshData.classes);
+      setSubjects(freshData.subjects);
+      setRooms(freshData.rooms);
+      setTimetables(freshData.timetables);
+      setAbsences(freshData.absences);
+      setSubstitutions(freshData.substitutions);
+      setIsSyncing(false);
+      showToast('Successfully restored default 8-period school data.');
+    }
+  };
+
+  // Timetable CRUD
+  const handleSaveTimetableEntry = (entry: TimetableEntry) => {
+    const existingIndex = timetables.findIndex((t) => t.id === entry.id);
+    let updated: TimetableEntry[];
+    if (existingIndex >= 0) {
+      updated = [...timetables];
+      updated[existingIndex] = entry;
+    } else {
+      updated = [...timetables, entry];
+    }
+
+    updateAppData({ timetables: updated });
+    syncDocToFirestore('timetables', entry.id, entry);
+    setIsTimetableModalOpen(false);
+    setActiveTimetableEntry(null);
+    showToast(`Timetable entry for ${entry.day} Period ${entry.period} saved.`);
+  };
+
+  const handleDeleteTimetableEntry = (id: string) => {
+    const updated = timetables.filter((t) => t.id !== id);
+    updateAppData({ timetables: updated });
+    deleteDocFromFirestore('timetables', id);
+    setIsTimetableModalOpen(false);
+    setActiveTimetableEntry(null);
+    showToast('Timetable entry deleted.');
+  };
+
+  // Bulk Import Handlers
+  const handleImportTeachers = (newTeachers: Teacher[], replace: boolean) => {
+    const finalTeachers = replace ? newTeachers : [...teachers.filter((t) => !newTeachers.some((nt) => nt.id === t.id)), ...newTeachers];
+    updateAppData({ teachers: finalTeachers });
+    newTeachers.forEach((t) => syncDocToFirestore('teachers', t.id, t));
+    showToast(`Imported ${newTeachers.length} teachers successfully!`);
+  };
+
+  const handleImportTimetable = (newEntries: TimetableEntry[], replace: boolean) => {
+    const finalTT = replace ? newEntries : [...timetables, ...newEntries];
+    updateAppData({ timetables: finalTT });
+    newEntries.forEach((tt) => syncDocToFirestore('timetables', tt.id, tt));
+    showToast(`Imported ${newEntries.length} timetable periods successfully!`);
+  };
+
+  const handleImportFullSetup = (fullData: any) => {
+    updateAppData({
+      teachers: fullData.teachers || teachers,
+      classes: fullData.classes || classes,
+      subjects: fullData.subjects || subjects,
+      rooms: fullData.rooms || rooms,
+      timetables: fullData.timetables || timetables
+    });
+    seedDatabase(fullData);
+    showToast('Full system configuration restored!');
+  };
+
+  // Teacher CRUD
+  const handleSaveTeacher = (teacher: Teacher) => {
+    const existing = teachers.findIndex((t) => t.id === teacher.id);
+    let updated: Teacher[];
+    if (existing >= 0) {
+      updated = [...teachers];
+      updated[existing] = teacher;
+    } else {
+      updated = [...teachers, teacher];
+    }
+    updateAppData({ teachers: updated });
+    syncDocToFirestore('teachers', teacher.id, teacher);
+    showToast(`Teacher ${teacher.name} saved.`);
+  };
+
+  const handleDeleteTeacher = (id: string) => {
+    const updated = teachers.filter((t) => t.id !== id);
+    updateAppData({ teachers: updated });
+    deleteDocFromFirestore('teachers', id);
+    showToast('Teacher record deleted.');
+  };
+
+  // Class CRUD
+  const handleSaveClass = (cls: ClassItem) => {
+    const existing = classes.findIndex((c) => c.id === cls.id);
+    let updated: ClassItem[];
+    if (existing >= 0) {
+      updated = [...classes];
+      updated[existing] = cls;
+    } else {
+      updated = [...classes, cls];
+    }
+    updateAppData({ classes: updated });
+    syncDocToFirestore('classes', cls.id, cls);
+    showToast(`Class ${cls.id} saved.`);
+  };
+
+  const handleDeleteClass = (id: string) => {
+    const updated = classes.filter((c) => c.id !== id);
+    updateAppData({ classes: updated });
+    deleteDocFromFirestore('classes', id);
+    showToast('Class deleted.');
+  };
+
+  // Subject CRUD
+  const handleSaveSubject = (subj: Subject) => {
+    const existing = subjects.findIndex((s) => s.id === subj.id);
+    let updated: Subject[];
+    if (existing >= 0) {
+      updated = [...subjects];
+      updated[existing] = subj;
+    } else {
+      updated = [...subjects, subj];
+    }
+    updateAppData({ subjects: updated });
+    syncDocToFirestore('subjects', subj.id, subj);
+    showToast(`Subject ${subj.name} saved.`);
+  };
+
+  const handleDeleteSubject = (id: string) => {
+    const updated = subjects.filter((s) => s.id !== id);
+    updateAppData({ subjects: updated });
+    deleteDocFromFirestore('subjects', id);
+    showToast('Subject deleted.');
+  };
+
+  // Room CRUD
+  const handleSaveRoom = (room: Room) => {
+    const existing = rooms.findIndex((r) => r.id === room.id);
+    let updated: Room[];
+    if (existing >= 0) {
+      updated = [...rooms];
+      updated[existing] = room;
+    } else {
+      updated = [...rooms, room];
+    }
+    updateAppData({ rooms: updated });
+    syncDocToFirestore('rooms', room.id, room);
+    showToast(`Room ${room.id} saved.`);
+  };
+
+  const handleDeleteRoom = (id: string) => {
+    const updated = rooms.filter((r) => r.id !== id);
+    updateAppData({ rooms: updated });
+    deleteDocFromFirestore('rooms', id);
+    showToast('Room deleted.');
+  };
+
+  // Single Absence & Substitute Creation
+  const handleMarkAbsent = (
+    teacherId: string,
+    teacherName: string,
+    date: string,
+    reason: string,
+    affectedPeriods: AffectedPeriod[]
+  ) => {
+    const dayOfWeek = getDayOfWeekFromDate(date);
+    const newAbsenceId = `abs-${Date.now().toString().slice(-6)}`;
+    const newAbsence: Absence = {
+      id: newAbsenceId,
+      teacherId,
+      teacherName,
+      date,
+      dayOfWeek,
+      reason,
+      createdAt: new Date().toISOString(),
+      affectedPeriodsCount: affectedPeriods.length
+    };
+
+    const newSubstitutions: Substitution[] = affectedPeriods.map((ap, idx) => ({
+      id: `sub-${newAbsenceId}-${idx + 1}`,
+      absenceId: newAbsenceId,
+      date,
+      day: dayOfWeek,
+      period: ap.period,
+      classId: ap.classId,
+      subjectId: ap.subjectId,
+      subjectName: ap.subjectName,
+      originalTeacherId: teacherId,
+      originalTeacherName: teacherName,
+      roomId: ap.roomId,
+      status: 'Pending'
+    }));
+
+    const updatedAbsences = [newAbsence, ...absences];
+    const updatedSubs = [...newSubstitutions, ...substitutions];
+
+    updateAppData({
+      absences: updatedAbsences,
+      substitutions: updatedSubs
+    });
+
+    syncDocToFirestore('absences', newAbsence.id, newAbsence);
+    newSubstitutions.forEach((sub) => {
+      syncDocToFirestore('substitutions', sub.id, sub);
+    });
+
+    showToast(
+      `Absence recorded for ${teacherName}. ${affectedPeriods.length} period(s) queued for substitute assignment.`
+    );
+  };
+
+  const handleRemoveAbsence = (absenceId: string) => {
+    const targetAbsence = absences.find((a) => a.id === absenceId);
+    const updatedAbsences = absences.filter((a) => a.id !== absenceId);
+    const updatedSubs = substitutions.filter((s) => s.absenceId !== absenceId);
+
+    updateAppData({
+      absences: updatedAbsences,
+      substitutions: updatedSubs
+    });
+
+    deleteDocFromFirestore('absences', absenceId);
+    showToast(`Absence record for ${targetAbsence?.teacherName || 'teacher'} removed.`);
+  };
+
+  // Single Substitution Assignment
+  const handleAssignSubstitute = (
+    substitutionId: string,
+    teacherId: string,
+    teacherName: string,
+    reason: string
+  ) => {
+    const updated = substitutions.map((sub) => {
+      if (sub.id === substitutionId) {
+        return {
+          ...sub,
+          status: 'Assigned' as const,
+          assignedSubstituteId: teacherId,
+          assignedSubstituteName: isAnonymous ? (teachers.find((t) => t.id === teacherId)?.anonymousCode || teacherId) : teacherName,
+          assignedAt: new Date().toISOString(),
+          assignedReason: reason
+        };
+      }
+      return sub;
+    });
+
+    updateAppData({ substitutions: updated });
+    const targetSub = updated.find((s) => s.id === substitutionId);
+    if (targetSub) {
+      syncDocToFirestore('substitutions', targetSub.id, targetSub);
+    }
+
+    setActiveAssignSub(null);
+    showToast(`Substitute assigned to Class ${targetSub?.classId} Period ${targetSub?.period}.`);
+  };
+
+  const handleUnassignSubstitute = (substitutionId: string) => {
+    const updated = substitutions.map((sub) => {
+      if (sub.id === substitutionId) {
+        return {
+          ...sub,
+          status: 'Pending' as const,
+          assignedSubstituteId: undefined,
+          assignedSubstituteName: undefined,
+          assignedAt: undefined,
+          assignedReason: undefined
+        };
+      }
+      return sub;
+    });
+
+    updateAppData({ substitutions: updated });
+    const targetSub = updated.find((s) => s.id === substitutionId);
+    if (targetSub) {
+      syncDocToFirestore('substitutions', targetSub.id, targetSub);
+    }
+    showToast('Substitute assignment reset to Pending.');
+  };
+
+  // Batch Auto-Assign
+  const handleAutoAssignAll = () => {
+    const pendingSubs = substitutions.filter((s) => s.status === 'Pending' && s.date === printRosterDate);
+    if (pendingSubs.length === 0) {
+      showToast('No pending substitutions to assign for this date.', 'info');
+      return;
+    }
+
+    const { updatedSubs, assignedCount } = autoAssignSubstitutions(
+      pendingSubs,
+      teachers,
+      subjects,
+      timetables,
+      absences,
+      substitutions
+    );
+
+    updateAppData({ substitutions: updatedSubs });
+    updatedSubs.forEach((s) => syncDocToFirestore('substitutions', s.id, s));
+    showToast(`Successfully auto-assigned ${assignedCount} substitution(s) with rest protection.`);
+  };
+
+  const activeTeacher = teachers.find((t) => t.id === selectedTeacherId) || teachers[0];
+
+  const handleOpenPrintRoster = (date?: string) => {
+    if (date) setPrintRosterDate(date);
+    setIsPrintRosterOpen(true);
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc' }}>
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div
+          className={`alert alert-${toastType}`}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9999,
+            minWidth: '280px',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+            borderLeft: '4px solid #2563eb'
+          }}
+        >
+          {toastMessage}
+        </div>
+      )}
+
+      {/* Main Clean Header Navigation */}
+      <HeaderNav
+        currentTab={currentTab}
+        onSelectTab={(tab) => setCurrentTab(tab)}
+        role={role}
+        onChangeRole={(newRole) => setRole(newRole)}
+        selectedTeacherId={selectedTeacherId}
+        onChangeSelectedTeacherId={(id) => setSelectedTeacherId(id)}
+        selectedClassId={selectedClassId}
+        onChangeSelectedClassId={(id) => setSelectedClassId(id)}
+        teachers={teachers}
+        classes={classes}
+        isAnonymous={isAnonymous}
+        onToggleAnonymous={handleToggleAnonymous}
+        onOpenPrintModal={() => handleOpenPrintRoster('2026-08-17')}
+        isSyncing={isSyncing}
+      />
+
+      {/* Admin View */}
+      {role === 'admin' && (
+        <main style={{ flex: 1 }}>
+          {/* Tab 1: Daily Substitute Desk */}
+          {(currentTab === 'substitutions' || currentTab === 'dashboard') && (
+            <DailySubstituteDesk
+              teachers={teachers}
+              classes={classes}
+              subjects={subjects}
+              timetables={timetables}
+              absences={absences}
+              substitutions={substitutions}
+              isAnonymous={isAnonymous}
+              onMarkAbsent={handleMarkAbsent}
+              onRemoveAbsence={handleRemoveAbsence}
+              onAssignSubstitute={(sub) => setActiveAssignSub(sub)}
+              onUnassignSubstitute={handleUnassignSubstitute}
+              onAutoAssignAll={handleAutoAssignAll}
+              onOpenPrintModal={(date) => handleOpenPrintRoster(date)}
+            />
+          )}
+
+          {/* Tab 2: Master Timetable */}
+          {currentTab === 'timetable' && (
+            <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
+              <TimetableGrid
+                entries={timetables}
+                teachers={teachers}
+                classes={classes}
+                subjects={subjects}
+                rooms={rooms}
+                isAnonymous={isAnonymous}
+                onCellClick={(entry) => {
+                  setActiveTimetableEntry(entry);
+                  setIsTimetableModalOpen(true);
+                }}
+                onAddNew={() => {
+                  setActiveTimetableEntry({});
+                  setIsTimetableModalOpen(true);
+                }}
+              />
+            </div>
+          )}
+
+          {/* Tab 3: Directory & Setup */}
+          {currentTab === 'directory' && (
+            <DirectorySetupView
+              teachers={teachers}
+              classes={classes}
+              subjects={subjects}
+              rooms={rooms}
+              timetables={timetables}
+              isAnonymous={isAnonymous}
+              onSaveTeacher={handleSaveTeacher}
+              onDeleteTeacher={handleDeleteTeacher}
+              onSaveClass={handleSaveClass}
+              onDeleteClass={handleDeleteClass}
+              onSaveSubject={handleSaveSubject}
+              onDeleteSubject={handleDeleteSubject}
+              onSaveRoom={handleSaveRoom}
+              onDeleteRoom={handleDeleteRoom}
+              onImportTeachers={handleImportTeachers}
+              onImportTimetable={handleImportTimetable}
+              onImportFullSetup={handleImportFullSetup}
+              onResetData={handleResetData}
+            />
+          )}
+        </main>
+      )}
+
+      {/* Teacher Portal */}
+      {role === 'teacher' && activeTeacher && (
+        <main style={{ flex: 1 }}>
+          <TeacherDashboardView
+            teacher={activeTeacher}
+            timetables={timetables}
+            subjects={subjects}
+            absences={absences}
+            substitutions={substitutions}
+            isAnonymous={isAnonymous}
+            onMarkSelfAbsent={() => {
+              const affected = findAffectedPeriods(activeTeacher.id, 'Monday', timetables, subjects);
+              handleMarkAbsent(
+                activeTeacher.id,
+                isAnonymous ? (activeTeacher.anonymousCode || activeTeacher.id) : activeTeacher.name,
+                '2026-08-17',
+                'Sick leave',
+                affected
+              );
+            }}
+          />
+        </main>
+      )}
+
+      {/* Student Portal */}
+      {role === 'student' && (
+        <main style={{ flex: 1 }}>
+          <StudentDashboardView
+            selectedClassId={selectedClassId}
+            classes={classes}
+            timetables={timetables}
+            subjects={subjects}
+            teachers={teachers}
+            absences={absences}
+            substitutions={substitutions}
+            isAnonymous={isAnonymous}
+          />
+        </main>
+      )}
+
+      {/* Timetable Add/Edit Modal */}
+      {isTimetableModalOpen && activeTimetableEntry && (
+        <TimetableModal
+          entry={activeTimetableEntry}
+          allEntries={timetables}
+          teachers={teachers}
+          classes={classes}
+          subjects={subjects}
+          rooms={rooms}
+          isAnonymous={isAnonymous}
+          onSave={handleSaveTimetableEntry}
+          onDelete={handleDeleteTimetableEntry}
+          onClose={() => {
+            setIsTimetableModalOpen(false);
+            setActiveTimetableEntry(null);
+          }}
+        />
+      )}
+
+      {/* Assign Substitute Modal */}
+      {activeAssignSub && (
+        <AssignSubstituteModal
+          substitution={activeAssignSub}
+          teachers={teachers}
+          subjects={subjects}
+          timetables={timetables}
+          absences={absences}
+          substitutions={substitutions}
+          isAnonymous={isAnonymous}
+          onAssign={handleAssignSubstitute}
+          onClose={() => setActiveAssignSub(null)}
+        />
+      )}
+
+      {/* Print Substituted Teachers & Classes Roster Modal */}
+      {isPrintRosterOpen && (
+        <PrintSubstitutedTeachersModal
+          substitutions={substitutions}
+          teachers={teachers}
+          classes={classes}
+          isAnonymous={isAnonymous}
+          defaultDate={printRosterDate}
+          onClose={() => setIsPrintRosterOpen(false)}
+        />
+      )}
+
+      {/* Clean Footer */}
+      <footer style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '16px 24px', textAlign: 'center', marginTop: 'auto' }}>
+        <div style={{ fontWeight: 600, color: '#334155', fontSize: '13px' }}>
+          Springfield School Timetable & Substitution Desk &bull; 8 Periods &bull; 6 Working Days (Mon–Sat)
+        </div>
+        <div style={{ marginTop: '4px', fontSize: '12px', color: '#64748b' }}>
+          {isAnonymous ? 'ANONYMOUS MODE ACTIVE' : 'STANDARD MODE'} &bull; Rest-Safe Algorithm Guaranteed &bull; Persistent Backend & Vercel Ready
+        </div>
+      </footer>
+    </div>
+  );
+}
