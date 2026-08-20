@@ -339,12 +339,24 @@ export function subscribeToRealtimeCloud(
     }
   }, (err) => console.warn('Rooms realtime sub note:', err));
 
+  const unsubAbsences = onSnapshot(collection(db, 'absences'), (snap) => {
+    const absences = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Absence));
+    onUpdate({ absences });
+  }, (err) => console.warn('Absences realtime sub note:', err));
+
+  const unsubSubstitutions = onSnapshot(collection(db, 'substitutions'), (snap) => {
+    const substitutions = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Substitution));
+    onUpdate({ substitutions });
+  }, (err) => console.warn('Substitutions realtime sub note:', err));
+
   return () => {
     unsubTimetables();
     unsubTeachers();
     unsubClasses();
     unsubSubjects();
     unsubRooms();
+    unsubAbsences();
+    unsubSubstitutions();
   };
 }
 

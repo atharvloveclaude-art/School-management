@@ -25,7 +25,11 @@ import {
   getDayOfWeekFromDate,
   autoAssignSubstitutions
 } from './services/substitutionService';
-import { deduplicateTimetable } from './services/conflictService';
+import {
+  deduplicateTimetable,
+  deduplicateSubstitutions,
+  deduplicateAbsences
+} from './services/conflictService';
 import { HeaderNav } from './components/HeaderNav';
 import { DailySubstituteDesk } from './components/DailySubstituteDesk';
 import { TimetableGrid } from './components/TimetableGrid';
@@ -76,34 +80,40 @@ export default function App() {
       try {
         const fullData = await fetchFullAppData();
         if (mounted) {
-          const { cleaned, removedIds } = deduplicateTimetable(fullData.timetables);
-          if (removedIds.length > 0) {
-            removedIds.forEach((id) => deleteDocFromFirestore('timetables', id));
+          const { cleaned: cleanTimetables, removedIds: removedTTIds } = deduplicateTimetable(fullData.timetables);
+          if (removedTTIds.length > 0) {
+            removedTTIds.forEach((id) => deleteDocFromFirestore('timetables', id));
           }
 
-          // Purge any orphan absences or substitutions that reference deleted mock teachers (e.g. Mr Sharma, Mr Das, T001)
-          const validTeacherIds = new Set(fullData.teachers.map((t) => t.id));
-          
-          const validAbsences = (fullData.absences || []).filter((a) => validTeacherIds.has(a.teacherId));
-          const orphanAbsences = (fullData.absences || []).filter((a) => !validTeacherIds.has(a.teacherId));
-          orphanAbsences.forEach((a) => deleteDocFromFirestore('absences', a.id));
+          const currentTeachers = fullData.teachers;
 
-          const validSubs = (fullData.substitutions || []).filter(
-            (s) => validTeacherIds.has(s.originalTeacherId) && (!s.assignedSubstituteId || validTeacherIds.has(s.assignedSubstituteId))
+          // Deduplicate and purge orphan/duplicate absences
+          const { cleaned: cleanAbsences, removedIds: removedAbsIds } = deduplicateAbsences(
+            fullData.absences || [],
+            currentTeachers
           );
-          const orphanSubs = (fullData.substitutions || []).filter(
-            (s) => !validTeacherIds.has(s.originalTeacherId) || (s.assignedSubstituteId && !validTeacherIds.has(s.assignedSubstituteId))
-          );
-          orphanSubs.forEach((s) => deleteDocFromFirestore('substitutions', s.id));
+          if (removedAbsIds.length > 0) {
+            removedAbsIds.forEach((id) => deleteDocFromFirestore('absences', id));
+          }
 
-          setTeachers(fullData.teachers);
+          // Deduplicate and purge orphan/duplicate substitutions (must match an active absence)
+          const { cleaned: cleanSubs, removedIds: removedSubIds } = deduplicateSubstitutions(
+            fullData.substitutions || [],
+            currentTeachers,
+            cleanAbsences
+          );
+          if (removedSubIds.length > 0) {
+            removedSubIds.forEach((id) => deleteDocFromFirestore('substitutions', id));
+          }
+
+          setTeachers(currentTeachers);
           setClasses(fullData.classes);
           setSubjects(fullData.subjects);
           setRooms(fullData.rooms);
-          setTimetables(cleaned);
-          setAbsences(validAbsences);
-          setSubstitutions(validSubs);
-          if (fullData.teachers[0]) setSelectedTeacherId(fullData.teachers[0].id);
+          setTimetables(cleanTimetables);
+          setAbsences(cleanAbsences);
+          setSubstitutions(cleanSubs);
+          if (currentTeachers[0]) setSelectedTeacherId(currentTeachers[0].id);
           if (fullData.classes[0]) setSelectedClassId(fullData.classes[0].id);
         }
       } catch (e) {
@@ -125,6 +135,20 @@ export default function App() {
       if (changes.classes && changes.classes.length > 0) setClasses(changes.classes);
       if (changes.subjects && changes.subjects.length > 0) setSubjects(changes.subjects);
       if (changes.rooms && changes.rooms.length > 0) setRooms(changes.rooms);
+      if (changes.absences) {
+        setTeachers((latestTeachers) => {
+          const { cleaned } = deduplicateAbsences(changes.absences || [], latestTeachers);
+          setAbsences(cleaned);
+          return latestTeachers;
+        });
+      }
+      if (changes.substitutions) {
+        setTeachers((latestTeachers) => {
+          const { cleaned } = deduplicateSubstitutions(changes.substitutions || [], latestTeachers);
+          setSubstitutions(cleaned);
+          return latestTeachers;
+        });
+      }
     });
 
     return () => {
@@ -410,7 +434,21 @@ export default function App() {
     affectedPeriods: AffectedPeriod[]
   ) => {
     const dayOfWeek = getDayOfWeekFromDate(date);
-    const newAbsenceId = `abs-${Date.now().toString().slice(-6)}`;
+    const cleanDate = date.replace(/[^0-9]/g, '');
+    const newAbsenceId = `abs-${cleanDate}-${teacherId.toLowerCase()}`;
+
+    // Remove any previous absence record for this teacher on this same date
+    const prevAbsence = absences.find((a) => a.teacherId === teacherId && a.date === date);
+    let baseAbsences = absences;
+    let baseSubs = substitutions;
+    if (prevAbsence) {
+      baseAbsences = baseAbsences.filter((a) => a.id !== prevAbsence.id);
+      const oldSubs = baseSubs.filter((s) => s.absenceId === prevAbsence.id);
+      baseSubs = baseSubs.filter((s) => s.absenceId !== prevAbsence.id);
+      deleteDocFromFirestore('absences', prevAbsence.id);
+      oldSubs.forEach((s) => deleteDocFromFirestore('substitutions', s.id));
+    }
+
     const newAbsence: Absence = {
       id: newAbsenceId,
       teacherId,
@@ -422,27 +460,37 @@ export default function App() {
       affectedPeriodsCount: affectedPeriods.length
     };
 
-    const newSubstitutions: Substitution[] = affectedPeriods.map((ap, idx) => ({
-      id: `sub-${newAbsenceId}-${idx + 1}`,
-      absenceId: newAbsenceId,
-      date,
-      day: dayOfWeek,
-      period: ap.period,
-      classId: ap.classId,
-      subjectId: ap.subjectId,
-      subjectName: ap.subjectName,
-      originalTeacherId: teacherId,
-      originalTeacherName: teacherName,
-      roomId: ap.roomId,
-      status: 'Pending'
-    }));
+    const newSubstitutions: Substitution[] = affectedPeriods.map((ap) => {
+      const cleanClass = ap.classId.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const subId = `sub-${cleanDate}-p${ap.period}-${cleanClass}`;
+      return {
+        id: subId,
+        absenceId: newAbsenceId,
+        date,
+        day: dayOfWeek,
+        period: ap.period,
+        classId: ap.classId,
+        subjectId: ap.subjectId,
+        subjectName: ap.subjectName,
+        originalTeacherId: teacherId,
+        originalTeacherName: teacherName,
+        roomId: ap.roomId,
+        status: 'Pending'
+      };
+    });
 
-    const updatedAbsences = [newAbsence, ...absences];
-    const updatedSubs = [...newSubstitutions, ...substitutions];
+    const combinedAbsences = [newAbsence, ...baseAbsences];
+    const combinedSubs = [...newSubstitutions, ...baseSubs];
+
+    const { cleaned: cleanAbs, removedIds: removedAbsIds } = deduplicateAbsences(combinedAbsences, teachers);
+    removedAbsIds.forEach((id) => deleteDocFromFirestore('absences', id));
+
+    const { cleaned: cleanSubs, removedIds: removedSubIds } = deduplicateSubstitutions(combinedSubs, teachers);
+    removedSubIds.forEach((id) => deleteDocFromFirestore('substitutions', id));
 
     updateAppData({
-      absences: updatedAbsences,
-      substitutions: updatedSubs
+      absences: cleanAbs,
+      substitutions: cleanSubs
     });
 
     syncDocToFirestore('absences', newAbsence.id, newAbsence);
@@ -458,7 +506,8 @@ export default function App() {
   const handleRemoveAbsence = (absenceId: string) => {
     const targetAbsence = absences.find((a) => a.id === absenceId);
     const updatedAbsences = absences.filter((a) => a.id !== absenceId);
-    const updatedSubs = substitutions.filter((s) => s.absenceId !== absenceId);
+    const targetSubs = substitutions.filter((s) => s.absenceId === absenceId || (targetAbsence && s.originalTeacherId === targetAbsence.teacherId && s.date === targetAbsence.date));
+    const updatedSubs = substitutions.filter((s) => !targetSubs.some((ts) => ts.id === s.id));
 
     updateAppData({
       absences: updatedAbsences,
@@ -466,11 +515,13 @@ export default function App() {
     });
 
     deleteDocFromFirestore('absences', absenceId);
+    targetSubs.forEach((s) => deleteDocFromFirestore('substitutions', s.id));
     showToast(`Absence record for ${targetAbsence?.teacherName || 'teacher'} removed.`);
   };
 
   const handleClearDateAbsences = (date: string) => {
     const removingAbsences = absences.filter((a) => a.date === date);
+    const removingSubs = substitutions.filter((s) => s.date === date);
     const updatedAbsences = absences.filter((a) => a.date !== date);
     const updatedSubs = substitutions.filter((s) => s.date !== date);
 
@@ -480,7 +531,30 @@ export default function App() {
     });
 
     removingAbsences.forEach((a) => deleteDocFromFirestore('absences', a.id));
+    removingSubs.forEach((s) => deleteDocFromFirestore('substitutions', s.id));
     showToast(`Cleared all recorded absences and substitutions for ${date}.`);
+  };
+
+  const handleDeleteSubstitution = (subId: string) => {
+    const updated = substitutions.filter((s) => s.id !== subId);
+    updateAppData({ substitutions: updated });
+    deleteDocFromFirestore('substitutions', subId);
+    showToast('Substitution cover requirement removed.');
+  };
+
+  const handleCleanDuplicateSubstitutions = () => {
+    const { cleaned: cleanAbs, removedIds: remAbs } = deduplicateAbsences(absences, teachers);
+    remAbs.forEach((id) => deleteDocFromFirestore('absences', id));
+
+    const { cleaned: cleanSubs, removedIds: remSubs } = deduplicateSubstitutions(substitutions, teachers, cleanAbs);
+    remSubs.forEach((id) => deleteDocFromFirestore('substitutions', id));
+
+    updateAppData({
+      substitutions: cleanSubs,
+      absences: cleanAbs
+    });
+
+    showToast(`Cleaned ${remSubs.length + remAbs.length} duplicate/orphan cover records!`);
   };
 
   // Single Substitution Assignment
@@ -622,6 +696,8 @@ export default function App() {
               onMarkAbsent={handleMarkAbsent}
               onRemoveAbsence={handleRemoveAbsence}
               onClearDateAbsences={handleClearDateAbsences}
+              onDeleteSubstitution={handleDeleteSubstitution}
+              onCleanDuplicates={handleCleanDuplicateSubstitutions}
               onAssignSubstitute={(sub) => setActiveAssignSub(sub)}
               onUnassignSubstitute={handleUnassignSubstitute}
               onAutoAssignAll={handleAutoAssignAll}

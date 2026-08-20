@@ -14,6 +14,8 @@ interface DailySubstituteDeskProps {
   onMarkAbsent: (teacherId: string, teacherName: string, date: string, reason: string, affectedPeriods: AffectedPeriod[]) => void;
   onRemoveAbsence: (absenceId: string) => void;
   onClearDateAbsences?: (date: string) => void;
+  onDeleteSubstitution?: (subId: string) => void;
+  onCleanDuplicates?: () => void;
   onAssignSubstitute: (sub: Substitution) => void;
   onUnassignSubstitute: (subId: string) => void;
   onAutoAssignAll: () => void;
@@ -31,6 +33,8 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
   onMarkAbsent,
   onRemoveAbsence,
   onClearDateAbsences,
+  onDeleteSubstitution,
+  onCleanDuplicates,
   onAssignSubstitute,
   onUnassignSubstitute,
   onAutoAssignAll,
@@ -47,13 +51,17 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
   // Validate against current teacher directory: exclude mock/deleted teachers
   const validTeacherIdSet = new Set(teachers.map((t) => t.id));
   const todaysAbsences = absences.filter((a) => a.date === selectedDate && validTeacherIdSet.has(a.teacherId));
-  const todaysSubs = substitutions.filter((s) => s.date === selectedDate && validTeacherIdSet.has(s.originalTeacherId));
+  const absentTeacherIds = new Set(todaysAbsences.map((a) => a.teacherId));
+
+  // A substitution ONLY exists if the teacher is actively marked absent for today
+  const todaysSubs = substitutions.filter(
+    (s) => s.date === selectedDate && validTeacherIdSet.has(s.originalTeacherId) && absentTeacherIds.has(s.originalTeacherId)
+  );
 
   const pendingSubs = todaysSubs.filter((s) => s.status === 'Pending');
   const assignedSubs = todaysSubs.filter((s) => s.status === 'Assigned');
 
-  // Teachers not marked absent for today
-  const absentTeacherIds = new Set(todaysAbsences.map((a) => a.teacherId));
+  // Teachers not marked absent for today (eligible to cover)
   const availableTeachers = teachers.filter((t) => !absentTeacherIds.has(t.id));
 
   const handleAddAbsence = (e: React.FormEvent) => {
@@ -391,8 +399,30 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
               </div>
             </div>
 
-            {/* Quick Action: 1-Click Auto Assign */}
-            <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Quick Action: 1-Click Auto Assign & Clean */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {onCleanDuplicates && (
+                <button
+                  onClick={onCleanDuplicates}
+                  title="Purge duplicate cover entries"
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#dc2626',
+                    border: '1px solid #fecaca',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  🧹 Clean Duplicates
+                </button>
+              )}
+
               {pendingSubs.length > 0 && (
                 <button
                   onClick={onAutoAssignAll}
@@ -556,7 +586,7 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
                                 {isAssigned ? 'Change' : 'Assign'}
                               </button>
 
-                              {isAssigned && (
+                              {isAssigned ? (
                                 <>
                                   <button
                                     onClick={() => setActiveDutySlip(sub)}
@@ -575,7 +605,7 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
                                   </button>
                                   <button
                                     onClick={() => onUnassignSubstitute(sub.id)}
-                                    title="Clear Assignment"
+                                    title="Unassign Cover (Set back to Pending)"
                                     style={{
                                       background: '#fee2e2',
                                       border: 'none',
@@ -589,6 +619,24 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
                                     ✕
                                   </button>
                                 </>
+                              ) : (
+                                onDeleteSubstitution && (
+                                  <button
+                                    onClick={() => onDeleteSubstitution(sub.id)}
+                                    title="Remove this substitution requirement"
+                                    style={{
+                                      background: '#f1f5f9',
+                                      border: '1px solid #e2e8f0',
+                                      color: '#94a3b8',
+                                      padding: '5px 8px',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    🗑️
+                                  </button>
+                                )
                               )}
                             </div>
                           </td>

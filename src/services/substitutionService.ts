@@ -274,6 +274,7 @@ export function getRecommendedSubstitutes(
 
 /**
  * Finds all classes taught by an absent teacher on a given day.
+ * Deduplicates by period so that each period produces at most 1 substitution requirement.
  */
 export function findAffectedPeriods(
   teacherId: string,
@@ -282,18 +283,34 @@ export function findAffectedPeriods(
   subjects: Subject[]
 ) {
   const subjectMap = new Map(subjects.map((s) => [s.id, s.name]));
+  const periodMap = new Map<number, {
+    period: number;
+    classId: string;
+    subjectId: string;
+    subjectName: string;
+    roomId: string;
+    day: DayOfWeek;
+  }>();
+
   const teacherTimetable = timetables
     .filter((t) => t.teacherId === teacherId && t.day === day)
     .sort((a, b) => Number(a.period) - Number(b.period));
 
-  return teacherTimetable.map((entry) => ({
-    period: Number(entry.period),
-    classId: entry.classId,
-    subjectId: entry.subjectId,
-    subjectName: subjectMap.get(entry.subjectId) || entry.subjectId,
-    roomId: entry.roomId,
-    day: entry.day
-  }));
+  for (const entry of teacherTimetable) {
+    const p = Number(entry.period);
+    if (!periodMap.has(p)) {
+      periodMap.set(p, {
+        period: p,
+        classId: entry.classId,
+        subjectId: entry.subjectId,
+        subjectName: subjectMap.get(entry.subjectId) || entry.subjectId,
+        roomId: entry.roomId,
+        day: entry.day
+      });
+    }
+  }
+
+  return Array.from(periodMap.values()).sort((a, b) => a.period - b.period);
 }
 
 /**
