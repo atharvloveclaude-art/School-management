@@ -13,6 +13,7 @@ interface DailySubstituteDeskProps {
   isAnonymous: boolean;
   onMarkAbsent: (teacherId: string, teacherName: string, date: string, reason: string, affectedPeriods: AffectedPeriod[]) => void;
   onRemoveAbsence: (absenceId: string) => void;
+  onClearDateAbsences?: (date: string) => void;
   onAssignSubstitute: (sub: Substitution) => void;
   onUnassignSubstitute: (subId: string) => void;
   onAutoAssignAll: () => void;
@@ -29,6 +30,7 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
   isAnonymous,
   onMarkAbsent,
   onRemoveAbsence,
+  onClearDateAbsences,
   onAssignSubstitute,
   onUnassignSubstitute,
   onAutoAssignAll,
@@ -41,8 +43,11 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
   const [activeDutySlip, setActiveDutySlip] = useState<Substitution | null>(null);
 
   const dayOfWeek = getDayOfWeekFromDate(selectedDate);
-  const todaysAbsences = absences.filter((a) => a.date === selectedDate);
-  const todaysSubs = substitutions.filter((s) => s.date === selectedDate);
+
+  // Validate against current teacher directory: exclude mock/deleted teachers
+  const validTeacherIdSet = new Set(teachers.map((t) => t.id));
+  const todaysAbsences = absences.filter((a) => a.date === selectedDate && validTeacherIdSet.has(a.teacherId));
+  const todaysSubs = substitutions.filter((s) => s.date === selectedDate && validTeacherIdSet.has(s.originalTeacherId));
 
   const pendingSubs = todaysSubs.filter((s) => s.status === 'Pending');
   const assignedSubs = todaysSubs.filter((s) => s.status === 'Assigned');
@@ -300,8 +305,27 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
 
           {/* Currently Absent Teachers List */}
           <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-              Absent Today ({todaysAbsences.length})
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Absent Today ({todaysAbsences.length})
+              </div>
+              {todaysAbsences.length > 0 && onClearDateAbsences && (
+                <button
+                  type="button"
+                  onClick={() => onClearDateAbsences(selectedDate)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#dc2626',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Clear All Today
+                </button>
+              )}
             </div>
 
             {todaysAbsences.length === 0 ? (

@@ -17,6 +17,7 @@ interface TimetableGridProps {
   isAnonymous?: boolean;
   onCellClick: (entry: Partial<TimetableEntry>) => void;
   onAddNew: () => void;
+  onCleanDuplicates?: () => void;
 }
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -30,9 +31,10 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   rooms,
   isAnonymous = false,
   onCellClick,
-  onAddNew
+  onAddNew,
+  onCleanDuplicates
 }) => {
-  const [selectedClass, setSelectedClass] = useState<string>('12-A');
+  const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
   const [selectedRoom, setSelectedRoom] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<string>('all');
@@ -45,12 +47,21 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   );
   const subjectMap = new Map(subjects.map((s) => [s.id, s.name]));
 
-  // Global double-booking audit across all entries in the entire system
-  const { teacherConflicts, roomConflicts } = useMemo(() => {
+  // Teacher double-booking audit: only flag if teaching 2 different classes at the same time
+  const { teacherConflicts, roomConflicts, duplicateCount } = useMemo(() => {
     const teacherSlots = new Map<string, TimetableEntry[]>();
     const roomSlots = new Map<string, TimetableEntry[]>();
+    const slotKeys = new Set<string>();
+    let dupes = 0;
 
     entries.forEach((e) => {
+      const slotKey = `${e.classId}-${e.day}-${e.period}`;
+      if (slotKeys.has(slotKey)) {
+        dupes++;
+      } else {
+        slotKeys.add(slotKey);
+      }
+
       const tKey = `${e.day}-P${e.period}-${e.teacherId}`;
       const rKey = `${e.day}-P${e.period}-${e.roomId}`;
 
@@ -63,21 +74,25 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
 
     const tConflicts: TimetableEntry[] = [];
     teacherSlots.forEach((group) => {
-      if (group.length > 1) {
+      // Check if distinct classes exist
+      const uniqueClasses = new Set(group.map(g => g.classId));
+      if (uniqueClasses.size > 1) {
         tConflicts.push(...group);
       }
     });
 
     const rConflicts: TimetableEntry[] = [];
     roomSlots.forEach((group) => {
-      if (group.length > 1) {
+      const uniqueClasses = new Set(group.map(g => g.classId));
+      if (uniqueClasses.size > 1) {
         rConflicts.push(...group);
       }
     });
 
     return {
       teacherConflicts: tConflicts,
-      roomConflicts: rConflicts
+      roomConflicts: rConflicts,
+      duplicateCount: dupes
     };
   }, [entries]);
 
@@ -103,22 +118,24 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
     return filteredEntries.find((e) => e.day === day && Number(e.period) === Number(period));
   };
 
+  const totalIssueCount = teacherConflicts.length + duplicateCount;
+
   return (
     <div className="page-section" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
       {/* Section Header with Live Double-Booking Health Check */}
       <div className="section-header" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '20px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
               Master School Timetable
             </h2>
-            {teacherConflicts.length === 0 ? (
+            {totalIssueCount === 0 ? (
               <span style={{ fontSize: '12px', background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '20px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 🛡️ 0 Teacher Double-Bookings (Conflict-Free)
               </span>
             ) : (
               <span style={{ fontSize: '12px', background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '20px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                ⚠️ {teacherConflicts.length} Double-Booking Conflicts Detected
+                ⚠️ {totalIssueCount} Scheduling Conflicts / Duplicates Detected
               </span>
             )}
           </div>
@@ -127,7 +144,25 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {totalIssueCount > 0 && onCleanDuplicates && (
+            <button
+              className="btn btn-sm"
+              onClick={onCleanDuplicates}
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                fontWeight: 700,
+                border: 'none',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 6px rgba(220,38,38,0.3)',
+                cursor: 'pointer'
+              }}
+            >
+              🧹 Clean Duplicate Conflicts (1-Click Fix)
+            </button>
+          )}
           <button
             className="btn btn-outline btn-sm"
             onClick={() => window.print()}
@@ -237,11 +272,11 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           </select>
         </div>
 
-        {(selectedClass !== '12-A' || selectedTeacher !== 'all' || selectedRoom !== 'all' || selectedDay !== 'all') && (
+        {(selectedClass !== 'all' || selectedTeacher !== 'all' || selectedRoom !== 'all' || selectedDay !== 'all') && (
           <button
             className="btn btn-outline btn-sm"
             onClick={() => {
-              setSelectedClass('12-A');
+              setSelectedClass('all');
               setSelectedTeacher('all');
               setSelectedRoom('all');
               setSelectedDay('all');
@@ -306,7 +341,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                           {teacherName}
                         </div>
                         <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                          {selectedClass === 'all' ? `[${entry.classId}] ` : ''}Rm {entry.roomId}
+                          {selectedClass === 'all' ? `[Class ${entry.classId}] ` : ''}Rm {entry.roomId}
                         </div>
                       </td>
                     );
@@ -319,9 +354,9 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                         onCellClick({
                           day,
                           period,
-                          classId: selectedClass !== 'all' ? selectedClass : '12-A',
-                          teacherId: selectedTeacher !== 'all' ? selectedTeacher : 'T001',
-                          roomId: selectedRoom !== 'all' ? selectedRoom : '204'
+                          classId: selectedClass !== 'all' ? selectedClass : (classes[0]?.id || '9-A'),
+                          teacherId: selectedTeacher !== 'all' ? selectedTeacher : (teachers[0]?.id || 'T001'),
+                          roomId: selectedRoom !== 'all' ? selectedRoom : (rooms[0]?.id || '204')
                         })
                       }
                       title={`Click to schedule ${day} Period ${period}`}

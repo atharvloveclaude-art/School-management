@@ -40,7 +40,7 @@ export const TimetableModal: React.FC<TimetableModalProps> = ({
 }) => {
   const [day, setDay] = useState<DayOfWeek>((entry.day as DayOfWeek) || 'Monday');
   const [period, setPeriod] = useState<number>(entry.period ? Number(entry.period) : 1);
-  const [classId, setClassId] = useState<string>(entry.classId || (classes[0]?.id || '12-A'));
+  const [classId, setClassId] = useState<string>(entry.classId || (classes[0]?.id || '9-A'));
   const [subjectId, setSubjectId] = useState<string>(entry.subjectId || (subjects[0]?.id || 'PHY'));
   const [teacherId, setTeacherId] = useState<string>(entry.teacherId || (teachers[0]?.id || 'T001'));
   const [roomId, setRoomId] = useState<string>(entry.roomId || (rooms[0]?.id || '204'));
@@ -65,41 +65,29 @@ export const TimetableModal: React.FC<TimetableModalProps> = ({
     );
   }, [entry.id, day, period, classId, subjectId, teacherId, roomId, allEntries, teachers, classes, rooms, subjects]);
 
-  // Live teacher busy map for this Day and Period
+  // Live teacher busy map: only if teaching in a DIFFERENT class
   const teacherBusyMap = useMemo(() => {
     const map = new Map<string, string>();
     allEntries.forEach((e) => {
       if (entry.id && e.id === entry.id) return;
-      if (e.day === day && Number(e.period) === Number(period)) {
+      if (e.day === day && Number(e.period) === Number(period) && e.classId !== classId) {
         map.set(e.teacherId, e.classId);
       }
     });
     return map;
-  }, [allEntries, entry.id, day, period]);
+  }, [allEntries, entry.id, day, period, classId]);
 
-  // Live room busy map for this Day and Period
+  // Live room busy map: only if occupied by a DIFFERENT class
   const roomBusyMap = useMemo(() => {
     const map = new Map<string, string>();
     allEntries.forEach((e) => {
       if (entry.id && e.id === entry.id) return;
-      if (e.day === day && Number(e.period) === Number(period)) {
+      if (e.day === day && Number(e.period) === Number(period) && e.classId !== classId) {
         map.set(e.roomId, e.classId);
       }
     });
     return map;
-  }, [allEntries, entry.id, day, period]);
-
-  // Live class busy map for this Day and Period
-  const classBusyMap = useMemo(() => {
-    const map = new Map<string, { subjectId: string; teacherId: string }>();
-    allEntries.forEach((e) => {
-      if (entry.id && e.id === entry.id) return;
-      if (e.day === day && Number(e.period) === Number(period)) {
-        map.set(e.classId, { subjectId: e.subjectId, teacherId: e.teacherId });
-      }
-    });
-    return map;
-  }, [allEntries, entry.id, day, period]);
+  }, [allEntries, entry.id, day, period, classId]);
 
   // Teacher workload & rest status check
   const teacherWorkload = useMemo(() => {
@@ -120,8 +108,12 @@ export const TimetableModal: React.FC<TimetableModalProps> = ({
       return;
     }
 
+    const cleanClass = classId.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanDay = day.toLowerCase().slice(0, 3);
+    const standardId = `tt-${cleanClass}-${cleanDay}-${period}`;
+
     const newEntry: TimetableEntry = {
-      id: entry.id || `tt-${classId.toLowerCase()}-${day.toLowerCase().slice(0, 3)}-${period}-${Date.now().toString().slice(-4)}`,
+      id: entry.id || standardId,
       day,
       period: Number(period),
       classId,
@@ -176,7 +168,7 @@ export const TimetableModal: React.FC<TimetableModalProps> = ({
                 {conflictResult.errorMessage}
               </div>
               <div style={{ fontSize: '11.5px', marginTop: '6px', color: '#b91c1c' }}>
-                Please select an available teacher, free room, or different period to resolve this collision.
+                Please select an available teacher or free room to resolve this collision.
               </div>
             </div>
           ) : (
@@ -196,7 +188,7 @@ export const TimetableModal: React.FC<TimetableModalProps> = ({
             >
               <span>🛡️</span>
               <div>
-                <strong>Conflict-Free Slot:</strong> Teacher, Room, and Class are all 100% available for {day} Period {period}.
+                <strong>Conflict-Free Slot:</strong> Teacher and Room are 100% available for {day} Period {period}.
               </div>
             </div>
           )}
@@ -260,26 +252,20 @@ export const TimetableModal: React.FC<TimetableModalProps> = ({
               </div>
             </div>
 
-            {/* Class Selection with Conflict Awareness */}
+            {/* Class Selection */}
             <div className="form-group">
               <label htmlFor="modal-class" style={{ fontWeight: 700, fontSize: '13px' }}>Class:</label>
               <select
                 id="modal-class"
                 value={classId}
                 onChange={(e) => setClassId(e.target.value)}
-                style={{
-                  fontWeight: 600,
-                  borderColor: classBusyMap.has(classId) ? '#f87171' : '#cbd5e1'
-                }}
+                style={{ fontWeight: 600 }}
               >
-                {classes.map((c) => {
-                  const isBusy = classBusyMap.has(c.id);
-                  return (
-                    <option key={c.id} value={c.id}>
-                      {isBusy ? `⛔ [Busy] ` : `✓ [Free] `} Class {c.id} (Grade {c.grade})
-                    </option>
-                  );
-                })}
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Class {c.id} (Grade {c.grade})
+                  </option>
+                ))}
               </select>
             </div>
 

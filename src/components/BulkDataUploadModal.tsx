@@ -147,7 +147,7 @@ export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
 
   const parseTimetableCSV = (csv: string): TimetableEntry[] => {
     const lines = csv.trim().split('\n');
-    const parsed: TimetableEntry[] = [];
+    const parsedMap = new Map<string, TimetableEntry>();
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -160,13 +160,17 @@ export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
       if (cols.length >= 6) {
         const day = (cols[0] as DayOfWeek) || 'Monday';
         const period = Number(cols[1]) || 1;
-        const classId = cols[2] || '12-A';
+        const classId = cols[2] || '9-A';
         const subjectId = cols[3] || 'GEN';
         const teacherId = cols[4] || 'T001';
         const roomId = cols[5] || '204';
 
-        parsed.push({
-          id: `tt-${classId.toLowerCase()}-${day.toLowerCase().slice(0, 3)}-${period}-${i}`,
+        const cleanClass = classId.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanDay = day.toLowerCase().slice(0, 3);
+        const standardId = `tt-${cleanClass}-${cleanDay}-${period}`;
+
+        parsedMap.set(standardId, {
+          id: standardId,
           day,
           period,
           classId,
@@ -177,7 +181,7 @@ export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
       }
     }
 
-    return parsed;
+    return Array.from(parsedMap.values());
   };
 
   const handleProcessImport = () => {

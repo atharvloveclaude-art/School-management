@@ -84,18 +84,7 @@ export const INITIAL_TIMETABLE: TimetableEntry[] = [
   { id: 'tt-12a-mon-8', day: 'Monday', period: 8, classId: '12-A', subjectId: 'PE', teacherId: 'T008', roomId: '204' }
 ];
 
-export const INITIAL_ABSENCES: Absence[] = [
-  {
-    id: 'abs-1',
-    teacherId: 'T001',
-    teacherName: 'Mr Sharma',
-    date: '2026-08-17',
-    dayOfWeek: 'Monday',
-    reason: 'Sick leave',
-    createdAt: '2026-08-17T07:00:00Z',
-    affectedPeriodsCount: 2
-  }
-];
+export const INITIAL_ABSENCES: Absence[] = [];
 
 export const INITIAL_SUBSTITUTIONS: Substitution[] = [];
 

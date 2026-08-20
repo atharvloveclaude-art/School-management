@@ -25,6 +25,7 @@ import {
   getDayOfWeekFromDate,
   autoAssignSubstitutions
 } from './services/substitutionService';
+import { deduplicateTimetable } from './services/conflictService';
 import { HeaderNav } from './components/HeaderNav';
 import { DailySubstituteDesk } from './components/DailySubstituteDesk';
 import { TimetableGrid } from './components/TimetableGrid';
@@ -75,13 +76,33 @@ export default function App() {
       try {
         const fullData = await fetchFullAppData();
         if (mounted) {
+          const { cleaned, removedIds } = deduplicateTimetable(fullData.timetables);
+          if (removedIds.length > 0) {
+            removedIds.forEach((id) => deleteDocFromFirestore('timetables', id));
+          }
+
+          // Purge any orphan absences or substitutions that reference deleted mock teachers (e.g. Mr Sharma, Mr Das, T001)
+          const validTeacherIds = new Set(fullData.teachers.map((t) => t.id));
+          
+          const validAbsences = (fullData.absences || []).filter((a) => validTeacherIds.has(a.teacherId));
+          const orphanAbsences = (fullData.absences || []).filter((a) => !validTeacherIds.has(a.teacherId));
+          orphanAbsences.forEach((a) => deleteDocFromFirestore('absences', a.id));
+
+          const validSubs = (fullData.substitutions || []).filter(
+            (s) => validTeacherIds.has(s.originalTeacherId) && (!s.assignedSubstituteId || validTeacherIds.has(s.assignedSubstituteId))
+          );
+          const orphanSubs = (fullData.substitutions || []).filter(
+            (s) => !validTeacherIds.has(s.originalTeacherId) || (s.assignedSubstituteId && !validTeacherIds.has(s.assignedSubstituteId))
+          );
+          orphanSubs.forEach((s) => deleteDocFromFirestore('substitutions', s.id));
+
           setTeachers(fullData.teachers);
           setClasses(fullData.classes);
           setSubjects(fullData.subjects);
           setRooms(fullData.rooms);
-          setTimetables(fullData.timetables);
-          setAbsences(fullData.absences);
-          setSubstitutions(fullData.substitutions);
+          setTimetables(cleaned);
+          setAbsences(validAbsences);
+          setSubstitutions(validSubs);
           if (fullData.teachers[0]) setSelectedTeacherId(fullData.teachers[0].id);
           if (fullData.classes[0]) setSelectedClassId(fullData.classes[0].id);
         }
@@ -96,7 +117,10 @@ export default function App() {
     // Real-time synchronization across multiple devices/laptops
     const unsubscribe = subscribeToRealtimeCloud((changes) => {
       if (!mounted) return;
-      if (changes.timetables && changes.timetables.length > 0) setTimetables(changes.timetables);
+      if (changes.timetables && changes.timetables.length > 0) {
+        const { cleaned } = deduplicateTimetable(changes.timetables);
+        setTimetables(cleaned);
+      }
       if (changes.teachers && changes.teachers.length > 0) setTeachers(changes.teachers);
       if (changes.classes && changes.classes.length > 0) setClasses(changes.classes);
       if (changes.subjects && changes.subjects.length > 0) setSubjects(changes.subjects);
@@ -205,20 +229,33 @@ export default function App() {
 
   // Timetable CRUD
   const handleSaveTimetableEntry = (entry: TimetableEntry) => {
-    const existingIndex = timetables.findIndex((t) => t.id === entry.id);
+    // Find if an entry already exists for this exact same slot (class + day + period)
+    const existingSlotIndex = timetables.findIndex(
+      (t) =>
+        t.id === entry.id ||
+        (t.classId === entry.classId && t.day === entry.day && Number(t.period) === Number(entry.period))
+    );
+
     let updated: TimetableEntry[];
-    if (existingIndex >= 0) {
+    if (existingSlotIndex >= 0) {
+      const oldEntry = timetables[existingSlotIndex];
+      if (oldEntry.id !== entry.id) {
+        deleteDocFromFirestore('timetables', oldEntry.id);
+      }
       updated = [...timetables];
-      updated[existingIndex] = entry;
+      updated[existingSlotIndex] = entry;
     } else {
       updated = [...timetables, entry];
     }
 
-    updateAppData({ timetables: updated });
+    const { cleaned, removedIds } = deduplicateTimetable(updated);
+    removedIds.forEach((id) => deleteDocFromFirestore('timetables', id));
+
+    updateAppData({ timetables: cleaned });
     syncDocToFirestore('timetables', entry.id, entry);
     setIsTimetableModalOpen(false);
     setActiveTimetableEntry(null);
-    showToast(`Timetable entry for ${entry.day} Period ${entry.period} saved.`);
+    showToast(`Timetable period for Class ${entry.classId} (${entry.day} Period ${entry.period}) saved.`);
   };
 
   const handleDeleteTimetableEntry = (id: string) => {
@@ -230,6 +267,22 @@ export default function App() {
     showToast('Timetable entry deleted.');
   };
 
+  const handleCleanDuplicateConflicts = () => {
+    const { cleaned, removedIds } = deduplicateTimetable(timetables);
+    removedIds.forEach((id) => deleteDocFromFirestore('timetables', id));
+    updateAppData({ timetables: cleaned });
+    pushFullStateToCloud({
+      teachers,
+      classes,
+      subjects,
+      rooms,
+      timetables: cleaned,
+      absences,
+      substitutions
+    });
+    showToast(`🧹 Cleaned ${removedIds.length} duplicate entries! Timetable is now conflict-free.`);
+  };
+
   // Bulk Import Handlers
   const handleImportTeachers = (newTeachers: Teacher[], replace: boolean) => {
     const finalTeachers = replace ? newTeachers : [...teachers.filter((t) => !newTeachers.some((nt) => nt.id === t.id)), ...newTeachers];
@@ -239,9 +292,12 @@ export default function App() {
   };
 
   const handleImportTimetable = (newEntries: TimetableEntry[], replace: boolean) => {
-    const finalTT = replace ? newEntries : [...timetables, ...newEntries];
-    updateAppData({ timetables: finalTT });
-    newEntries.forEach((tt) => syncDocToFirestore('timetables', tt.id, tt));
+    const combined = replace ? newEntries : [...timetables, ...newEntries];
+    const { cleaned, removedIds } = deduplicateTimetable(combined);
+    removedIds.forEach((id) => deleteDocFromFirestore('timetables', id));
+
+    updateAppData({ timetables: cleaned });
+    cleaned.forEach((tt) => syncDocToFirestore('timetables', tt.id, tt));
     showToast(`Imported ${newEntries.length} timetable periods successfully!`);
   };
 
@@ -413,6 +469,20 @@ export default function App() {
     showToast(`Absence record for ${targetAbsence?.teacherName || 'teacher'} removed.`);
   };
 
+  const handleClearDateAbsences = (date: string) => {
+    const removingAbsences = absences.filter((a) => a.date === date);
+    const updatedAbsences = absences.filter((a) => a.date !== date);
+    const updatedSubs = substitutions.filter((s) => s.date !== date);
+
+    updateAppData({
+      absences: updatedAbsences,
+      substitutions: updatedSubs
+    });
+
+    removingAbsences.forEach((a) => deleteDocFromFirestore('absences', a.id));
+    showToast(`Cleared all recorded absences and substitutions for ${date}.`);
+  };
+
   // Single Substitution Assignment
   const handleAssignSubstitute = (
     substitutionId: string,
@@ -551,6 +621,7 @@ export default function App() {
               isAnonymous={isAnonymous}
               onMarkAbsent={handleMarkAbsent}
               onRemoveAbsence={handleRemoveAbsence}
+              onClearDateAbsences={handleClearDateAbsences}
               onAssignSubstitute={(sub) => setActiveAssignSub(sub)}
               onUnassignSubstitute={handleUnassignSubstitute}
               onAutoAssignAll={handleAutoAssignAll}
@@ -568,6 +639,7 @@ export default function App() {
                 subjects={subjects}
                 rooms={rooms}
                 isAnonymous={isAnonymous}
+                onCleanDuplicates={handleCleanDuplicateConflicts}
                 onCellClick={(entry) => {
                   setActiveTimetableEntry(entry);
                   setIsTimetableModalOpen(true);

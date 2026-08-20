@@ -26,34 +26,33 @@ export function detectTimetableConflict(
   const currentRoomName = roomMap.get(newEntry.roomId) || newEntry.roomId;
 
   for (const entry of existingEntries) {
-    // Skip checking against itself when updating
+    // 1. Skip exact ID match
     if (newEntry.id && entry.id === newEntry.id) {
       continue;
     }
 
-    // Must be the same day and period for a time collision
+    // 2. Skip if this is the exact same class slot being updated/replaced (prevent self-conflict)
+    if (
+      entry.classId === newEntry.classId &&
+      entry.day === newEntry.day &&
+      Number(entry.period) === Number(newEntry.period)
+    ) {
+      continue;
+    }
+
+    // Must be the same day and period for a collision
     if (entry.day === newEntry.day && Number(entry.period) === Number(newEntry.period)) {
-      // 1. Teacher Conflict: Is the same teacher assigned elsewhere in this period?
-      if (entry.teacherId === newEntry.teacherId) {
+      // 1. Teacher Conflict: Is the same teacher assigned in a DIFFERENT class during this period?
+      if (entry.teacherId === newEntry.teacherId && entry.classId !== newEntry.classId) {
         const assignedClass = entry.classId;
         return {
           hasConflict: true,
-          errorMessage: `${teacherName} is already teaching ${assignedClass} during ${newEntry.day} Period ${newEntry.period}.`
+          errorMessage: `${teacherName} is already teaching Class ${assignedClass} during ${newEntry.day} Period ${newEntry.period}.`
         };
       }
 
-      // 2. Class Conflict: Does this class already have another subject scheduled?
-      if (entry.classId === newEntry.classId) {
-        const existingSubject = subjectMap.get(entry.subjectId) || entry.subjectId;
-        const existingTeacher = teacherMap.get(entry.teacherId) || entry.teacherId;
-        return {
-          hasConflict: true,
-          errorMessage: `Class ${currentClassName} is already scheduled for ${existingSubject} with ${existingTeacher} during ${newEntry.day} Period ${newEntry.period}.`
-        };
-      }
-
-      // 3. Room Conflict: Is this room already occupied by another class?
-      if (entry.roomId === newEntry.roomId) {
+      // 2. Room Conflict: Is this room already occupied by a DIFFERENT class?
+      if (entry.roomId === newEntry.roomId && entry.classId !== newEntry.classId) {
         const occupyingClass = entry.classId;
         return {
           hasConflict: true,
@@ -66,5 +65,34 @@ export function detectTimetableConflict(
   return {
     hasConflict: false,
     errorMessage: null
+  };
+}
+
+/**
+ * Deduplicate timetable entries: ensures exactly one entry exists per (classId + day + period).
+ * Returns the cleaned array and the list of deleted duplicate IDs so they can be purged from Firestore.
+ */
+export function deduplicateTimetable(entries: TimetableEntry[]): {
+  cleaned: TimetableEntry[];
+  removedIds: string[];
+} {
+  const map = new Map<string, TimetableEntry>();
+  const removedIds: string[] = [];
+
+  for (const e of entries) {
+    const key = `${e.classId.trim().toLowerCase()}_${e.day.trim().toLowerCase()}_${Number(e.period)}`;
+    if (map.has(key)) {
+      const existing = map.get(key)!;
+      // Mark older one for removal
+      removedIds.push(existing.id);
+      map.set(key, e);
+    } else {
+      map.set(key, e);
+    }
+  }
+
+  return {
+    cleaned: Array.from(map.values()),
+    removedIds
   };
 }
