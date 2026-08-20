@@ -25,6 +25,7 @@ interface DirectorySetupViewProps {
   onImportTimetable: (entries: TimetableEntry[], replace: boolean) => void;
   onImportFullSetup: (data: any) => void;
   onResetData: () => void;
+  onPushToCloud?: () => void;
 }
 
 export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
@@ -45,7 +46,8 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
   onImportTeachers,
   onImportTimetable,
   onImportFullSetup,
-  onResetData
+  onResetData,
+  onPushToCloud
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'teachers' | 'classes' | 'subjects' | 'rooms' | 'backup'>('teachers');
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
@@ -82,7 +84,30 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {onPushToCloud && (
+            <button
+              onClick={onPushToCloud}
+              title="Push all timetable periods, teachers, and subjects in this tab directly to Cloud Database"
+              style={{
+                backgroundColor: '#16a34a',
+                color: '#ffffff',
+                border: 'none',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 6px rgba(22,163,74,0.3)'
+              }}
+            >
+              ☁️ Save & Sync Tab to Cloud
+            </button>
+          )}
+
           <button
             onClick={() => setIsBulkModalOpen(true)}
             style={{

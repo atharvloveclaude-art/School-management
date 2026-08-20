@@ -14,6 +14,8 @@ import {
   fetchFullAppData,
   seedDatabase,
   saveLocalData,
+  pushFullStateToCloud,
+  subscribeToRealtimeCloud,
   syncDocToFirestore,
   deleteDocFromFirestore,
   AppDataState
@@ -65,28 +67,46 @@ export default function App() {
   const [toastType, setToastType] = useState<'success' | 'info' | 'error'>('success');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // Initialize data on mount
+  // Initialize data on mount & subscribe to real-time updates across multiple laptops
   useEffect(() => {
+    let mounted = true;
     async function loadData() {
       setIsSyncing(true);
       try {
         const fullData = await fetchFullAppData();
-        setTeachers(fullData.teachers);
-        setClasses(fullData.classes);
-        setSubjects(fullData.subjects);
-        setRooms(fullData.rooms);
-        setTimetables(fullData.timetables);
-        setAbsences(fullData.absences);
-        setSubstitutions(fullData.substitutions);
-        if (fullData.teachers[0]) setSelectedTeacherId(fullData.teachers[0].id);
-        if (fullData.classes[0]) setSelectedClassId(fullData.classes[0].id);
+        if (mounted) {
+          setTeachers(fullData.teachers);
+          setClasses(fullData.classes);
+          setSubjects(fullData.subjects);
+          setRooms(fullData.rooms);
+          setTimetables(fullData.timetables);
+          setAbsences(fullData.absences);
+          setSubstitutions(fullData.substitutions);
+          if (fullData.teachers[0]) setSelectedTeacherId(fullData.teachers[0].id);
+          if (fullData.classes[0]) setSelectedClassId(fullData.classes[0].id);
+        }
       } catch (e) {
         console.error('Data initialization error:', e);
       } finally {
-        setIsSyncing(false);
+        if (mounted) setIsSyncing(false);
       }
     }
     loadData();
+
+    // Real-time synchronization across multiple devices/laptops
+    const unsubscribe = subscribeToRealtimeCloud((changes) => {
+      if (!mounted) return;
+      if (changes.timetables && changes.timetables.length > 0) setTimetables(changes.timetables);
+      if (changes.teachers && changes.teachers.length > 0) setTeachers(changes.teachers);
+      if (changes.classes && changes.classes.length > 0) setClasses(changes.classes);
+      if (changes.subjects && changes.subjects.length > 0) setSubjects(changes.subjects);
+      if (changes.rooms && changes.rooms.length > 0) setRooms(changes.rooms);
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const showToast = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -95,6 +115,45 @@ export default function App() {
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  // Push whatever is in the current open tab directly into Cloud Firestore
+  const handlePushActiveTabToCloud = async () => {
+    setIsSyncing(true);
+    const currentData: AppDataState = {
+      teachers,
+      classes,
+      subjects,
+      rooms,
+      timetables,
+      absences,
+      substitutions
+    };
+
+    const success = await pushFullStateToCloud(currentData);
+    setIsSyncing(false);
+
+    if (success) {
+      showToast(
+        `☁️ Success! Synced ${timetables.length} timetable periods and ${teachers.length} teachers to Cloud. All other laptops will now see this instantly!`
+      );
+    } else {
+      showToast('Cloud database sync warning, data saved in local cache.', 'info');
+    }
+  };
+
+  const handleRefreshFromCloud = async () => {
+    setIsSyncing(true);
+    const freshData = await fetchFullAppData();
+    setTeachers(freshData.teachers);
+    setClasses(freshData.classes);
+    setSubjects(freshData.subjects);
+    setRooms(freshData.rooms);
+    setTimetables(freshData.timetables);
+    setAbsences(freshData.absences);
+    setSubstitutions(freshData.substitutions);
+    setIsSyncing(false);
+    showToast(`🔄 Refreshed ${freshData.timetables.length} timetable entries from cloud database.`);
   };
 
   const handleToggleAnonymous = () => {
@@ -473,6 +532,8 @@ export default function App() {
         onToggleAnonymous={handleToggleAnonymous}
         onOpenPrintModal={() => handleOpenPrintRoster('2026-08-17')}
         isSyncing={isSyncing}
+        onPushToCloud={handlePushActiveTabToCloud}
+        onRefreshFromCloud={handleRefreshFromCloud}
       />
 
       {/* Admin View */}
@@ -540,6 +601,7 @@ export default function App() {
               onImportTimetable={handleImportTimetable}
               onImportFullSetup={handleImportFullSetup}
               onResetData={handleResetData}
+              onPushToCloud={handlePushActiveTabToCloud}
             />
           )}
         </main>

@@ -16,6 +16,8 @@ interface HeaderNavProps {
   onToggleAnonymous: () => void;
   onOpenPrintModal: () => void;
   isSyncing: boolean;
+  onPushToCloud?: () => void;
+  onRefreshFromCloud?: () => void;
 }
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({
@@ -32,7 +34,9 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   isAnonymous,
   onToggleAnonymous,
   onOpenPrintModal,
-  isSyncing
+  isSyncing,
+  onPushToCloud,
+  onRefreshFromCloud
 }) => {
   return (
     <>
@@ -61,18 +65,42 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             <div>
               <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 Springfield Timetable & Substitute Desk
-                <span style={{ fontSize: '11px', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
-                  {isSyncing ? 'Syncing...' : '🟢 Backend Connected'}
+                <span style={{ fontSize: '11px', background: isSyncing ? '#fef3c7' : '#dcfce7', color: isSyncing ? '#92400e' : '#166534', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                  {isSyncing ? '⏳ Cloud Syncing...' : '🟢 Live Multi-Device Sync'}
                 </span>
               </div>
               <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>
-                8 Periods/Day &bull; 6 Working Days &bull; Rest-Safe Scheduling
+                8 Periods/Day &bull; 6 Working Days &bull; Real-time Multi-User Cloud Connected
               </div>
             </div>
           </div>
 
           {/* Quick Actions & Role Switcher */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Sync Tab to Cloud Button (Lifesaver for multiple laptops) */}
+            {onPushToCloud && (
+              <button
+                onClick={onPushToCloud}
+                title="Immediately push whatever is currently in this open tab to the Cloud database"
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(37,99,235,0.3)'
+                }}
+              >
+                ☁️ Save This Tab to Cloud
+              </button>
+            )}
+
             {/* Direct Print Button */}
             <button
               onClick={onOpenPrintModal}
