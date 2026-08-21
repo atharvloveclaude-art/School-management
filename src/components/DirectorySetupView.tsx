@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { Teacher, ClassItem, Subject, Room, TimetableEntry } from '../types';
+import { Teacher, ClassItem, Subject, TimetableEntry } from '../types';
 import { TeachersView } from './TeachersView';
 import { ClassesView } from './ClassesView';
 import { SubjectsView } from './SubjectsView';
-import { RoomsView } from './RoomsView';
 import { BulkDataUploadModal } from './BulkDataUploadModal';
 
 interface DirectorySetupViewProps {
   teachers: Teacher[];
   classes: ClassItem[];
   subjects: Subject[];
-  rooms: Room[];
   timetables: TimetableEntry[];
   isAnonymous: boolean;
   onSaveTeacher: (t: Teacher) => void;
@@ -19,8 +17,6 @@ interface DirectorySetupViewProps {
   onDeleteClass: (id: string) => void;
   onSaveSubject: (s: Subject) => void;
   onDeleteSubject: (id: string) => void;
-  onSaveRoom: (r: Room) => void;
-  onDeleteRoom: (id: string) => void;
   onImportTeachers: (teachers: Teacher[], replace: boolean) => void;
   onImportTimetable: (entries: TimetableEntry[], replace: boolean) => void;
   onImportFullSetup: (data: any) => void;
@@ -32,7 +28,6 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
   teachers,
   classes,
   subjects,
-  rooms,
   timetables,
   isAnonymous,
   onSaveTeacher,
@@ -41,15 +36,13 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
   onDeleteClass,
   onSaveSubject,
   onDeleteSubject,
-  onSaveRoom,
-  onDeleteRoom,
   onImportTeachers,
   onImportTimetable,
   onImportFullSetup,
   onResetData,
   onPushToCloud
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'teachers' | 'classes' | 'subjects' | 'rooms' | 'backup'>('teachers');
+  const [activeSubTab, setActiveSubTab] = useState<'teachers' | 'classes' | 'subjects' | 'backup'>('teachers');
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
 
   const handleExportJson = () => {
@@ -57,7 +50,6 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
       teachers,
       classes,
       subjects,
-      rooms,
       timetables,
       exportedAt: new Date().toISOString()
     };
@@ -79,7 +71,7 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
             👥 School Directory & Master Setup
           </h1>
           <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-            Manage staff profiles, grade sections, subjects, classrooms, and data backups.
+            Manage staff profiles, grade sections, subjects, and data backups.
           </p>
         </div>
 
@@ -207,22 +199,6 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveSubTab('rooms')}
-          style={{
-            padding: '10px 18px',
-            fontWeight: 700,
-            fontSize: '14px',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            borderBottom: activeSubTab === 'rooms' ? '3px solid #2563eb' : '3px solid transparent',
-            color: activeSubTab === 'rooms' ? '#2563eb' : '#64748b'
-          }}
-        >
-          🚪 Rooms & Labs ({rooms.length})
-        </button>
-
-        <button
           onClick={() => setActiveSubTab('backup')}
           style={{
             padding: '10px 18px',
@@ -256,7 +232,6 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
       {activeSubTab === 'classes' && (
         <ClassesView
           classes={classes}
-          rooms={rooms}
           onSaveClass={onSaveClass}
           onDeleteClass={onDeleteClass}
         />
@@ -267,14 +242,6 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
           subjects={subjects}
           onSaveSubject={onSaveSubject}
           onDeleteSubject={onDeleteSubject}
-        />
-      )}
-
-      {activeSubTab === 'rooms' && (
-        <RoomsView
-          rooms={rooms}
-          onSaveRoom={onSaveRoom}
-          onDeleteRoom={onDeleteRoom}
         />
       )}
 
@@ -342,7 +309,6 @@ export const DirectorySetupView: React.FC<DirectorySetupViewProps> = ({
           timetables={timetables}
           classes={classes}
           subjects={subjects}
-          rooms={rooms}
           onImportTeachers={onImportTeachers}
           onImportTimetable={onImportTimetable}
           onImportFullSetup={onImportFullSetup}

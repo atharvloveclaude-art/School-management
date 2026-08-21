@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
-import { Teacher, TimetableEntry, ClassItem, Subject, Room, DayOfWeek } from '../types';
+import { Teacher, TimetableEntry, ClassItem, Subject, DayOfWeek } from '../types';
 
 interface BulkDataUploadModalProps {
   teachers: Teacher[];
   timetables: TimetableEntry[];
   classes: ClassItem[];
   subjects: Subject[];
-  rooms: Room[];
   onImportTeachers: (newTeachers: Teacher[], replace: boolean) => void;
   onImportTimetable: (newEntries: TimetableEntry[], replace: boolean) => void;
   onImportFullSetup: (fullData: {
     teachers: Teacher[];
     classes: ClassItem[];
     subjects: Subject[];
-    rooms: Room[];
     timetables: TimetableEntry[];
   }) => void;
   onClose: () => void;
@@ -31,62 +29,22 @@ T008,Coach Rawat,Physical Education,Physical Education,9866778899,rawat@school.e
 T009,Mrs Iyer,Social Studies,Social Studies,9877889900,iyer@school.edu,T-SOC-01
 T010,Mr Das,Mathematics,Mathematics,9888990011,das@school.edu,T-MAT-02`;
 
-const SAMPLE_TIMETABLE_CSV = `Day,Period,ClassID,SubjectID,TeacherID,RoomID
-Monday,1,12-A,PHY,T001,204
-Monday,2,12-A,PHY,T001,204
-Monday,3,12-A,ENG,T007,204
-Monday,4,12-A,CHEM,T003,205
-Monday,5,12-A,CS,T006,LAB-1
-Monday,6,12-A,MAT,T002,204
-Monday,7,12-A,BIO,T005,BIO-LAB
-Monday,8,12-A,PE,T008,204
-Tuesday,1,12-A,MAT,T002,204
-Tuesday,2,12-A,PHY,T001,204
-Tuesday,3,12-A,CS,T006,LAB-1
-Tuesday,4,12-A,ENG,T007,204
-Tuesday,5,12-A,PE,T008,204
-Tuesday,6,12-A,CHEM,T003,205
-Tuesday,7,12-A,SOC,T009,204
-Tuesday,8,12-A,MAT,T010,204
-Wednesday,1,12-A,CHEM,T003,205
-Wednesday,2,12-A,MAT,T002,204
-Wednesday,3,12-A,PHY,T001,204
-Wednesday,4,12-A,CS,T006,LAB-1
-Wednesday,5,12-A,ENG,T007,204
-Wednesday,6,12-A,BIO,T005,BIO-LAB
-Wednesday,7,12-A,PHY,T004,204
-Wednesday,8,12-A,PE,T008,204
-Thursday,1,12-A,CS,T006,LAB-1
-Thursday,2,12-A,PHY,T001,204
-Thursday,3,12-A,MAT,T002,204
-Thursday,4,12-A,ENG,T007,204
-Thursday,5,12-A,CHEM,T003,205
-Thursday,6,12-A,SOC,T009,204
-Thursday,7,12-A,BIO,T005,BIO-LAB
-Thursday,8,12-A,MAT,T010,204
-Friday,1,12-A,PHY,T001,204
-Friday,2,12-A,CS,T006,LAB-1
-Friday,3,12-A,CHEM,T003,205
-Friday,4,12-A,MAT,T002,204
-Friday,5,12-A,ENG,T007,204
-Friday,6,12-A,PE,T008,204
-Friday,7,12-A,SOC,T009,204
-Friday,8,12-A,BIO,T005,BIO-LAB
-Saturday,1,12-A,MAT,T002,204
-Saturday,2,12-A,PHY,T001,204
-Saturday,3,12-A,CHEM,T003,205
-Saturday,4,12-A,ENG,T007,204
-Saturday,5,12-A,CS,T006,LAB-1
-Saturday,6,12-A,SOC,T009,204
-Saturday,7,12-A,BIO,T005,BIO-LAB
-Saturday,8,12-A,PE,T008,204`;
+const SAMPLE_TIMETABLE_CSV = `Day,Period,ClassID,SubjectID,TeacherID,Batch,Frequency
+Monday,1,11-A,CS,T006,CS Batch,all
+Monday,1,11-A,BIO,T005,Bio Batch,all
+Monday,2,11-A,PHY,T001,,all
+Monday,3,11-A,ENG,T007,,all
+Monday,4,11-A,CHEM,T003,,all
+Monday,5,11-A,MAT,T002,,all
+Monday,6,11-A,PE,T008,,1st_2nd
+Monday,7,11-A,SOC,T009,,all
+Monday,8,11-A,MAT,T010,,all`;
 
 export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
   teachers,
   timetables,
   classes,
   subjects,
-  rooms,
   onImportTeachers,
   onImportTimetable,
   onImportFullSetup,
@@ -157,17 +115,20 @@ export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
       }
 
       const cols = line.split(',').map(c => c.trim());
-      if (cols.length >= 6) {
+      if (cols.length >= 5) {
         const day = (cols[0] as DayOfWeek) || 'Monday';
         const period = Number(cols[1]) || 1;
         const classId = cols[2] || '9-A';
         const subjectId = cols[3] || 'GEN';
         const teacherId = cols[4] || 'T001';
-        const roomId = cols[5] || '204';
+        const batch = cols[5] ? cols[5].trim() : undefined;
+        const frequency = cols[6] ? (cols[6].trim() as any) : undefined;
 
         const cleanClass = classId.toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanDay = day.toLowerCase().slice(0, 3);
-        const standardId = `tt-${cleanClass}-${cleanDay}-${period}`;
+        const batchSlug = (batch || subjectId).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const teacherSlug = teacherId.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const standardId = `tt-${cleanClass}-${cleanDay}-p${period}-${batchSlug}-${teacherSlug}`;
 
         parsedMap.set(standardId, {
           id: standardId,
@@ -176,7 +137,8 @@ export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
           classId,
           subjectId,
           teacherId,
-          roomId
+          batch,
+          frequency
         });
       }
     }
@@ -206,7 +168,7 @@ export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
           return;
         }
         onImportTimetable(parsed, replaceExisting);
-        setStatusMessage({ type: 'success', text: `Successfully imported ${parsed.length} timetable periods across the 6 days!` });
+        setStatusMessage({ type: 'success', text: `Successfully imported ${parsed.length} timetable periods!` });
       } else if (activeTab === 'backup') {
         const full = JSON.parse(inputText);
         if (full.teachers && full.timetables) {
@@ -226,7 +188,6 @@ export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
       teachers,
       classes,
       subjects,
-      rooms,
       timetables
     };
     const jsonStr = JSON.stringify(backup, null, 2);
@@ -321,7 +282,7 @@ export const BulkDataUploadModal: React.FC<BulkDataUploadModalProps> = ({
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <p style={{ fontSize: '13px', color: '#4b5563' }}>
-                  Paste CSV lines in format: <code>Day,Period(1-8),ClassID,SubjectID,TeacherID,RoomID</code>
+                  Paste CSV lines in format: <code>Day,Period(1-8),ClassID,SubjectID,TeacherID,Batch(optional),Frequency(optional)</code>
                 </p>
                 <button className="btn btn-outline btn-sm" onClick={handleLoadSampleTimetable}>
                   Load Sample 8-Period Timetable CSV

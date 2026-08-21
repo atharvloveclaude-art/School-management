@@ -253,11 +253,16 @@ export default function App() {
 
   // Timetable CRUD
   const handleSaveTimetableEntry = (entry: TimetableEntry) => {
-    // Find if an entry already exists for this exact same slot (class + day + period)
+    // Find if an entry already exists for this exact same slot (class + day + period + batch/subject + frequency)
     const existingSlotIndex = timetables.findIndex(
       (t) =>
         t.id === entry.id ||
-        (t.classId === entry.classId && t.day === entry.day && Number(t.period) === Number(entry.period))
+        (t.classId === entry.classId &&
+          t.day === entry.day &&
+          Number(t.period) === Number(entry.period) &&
+          (t.batch || t.subjectId) === (entry.batch || entry.subjectId) &&
+          t.teacherId === entry.teacherId &&
+          (t.frequency || 'all') === (entry.frequency || 'all'))
     );
 
     let updated: TimetableEntry[];
@@ -462,7 +467,9 @@ export default function App() {
 
     const newSubstitutions: Substitution[] = affectedPeriods.map((ap) => {
       const cleanClass = ap.classId.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const subId = `sub-${cleanDate}-p${ap.period}-${cleanClass}`;
+      const batchSlug = (ap.batch || ap.subjectId).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const teacherSlug = teacherId.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const subId = `sub-${cleanDate}-p${ap.period}-${cleanClass}-${batchSlug}-${teacherSlug}`;
       return {
         id: subId,
         absenceId: newAbsenceId,
@@ -475,6 +482,8 @@ export default function App() {
         originalTeacherId: teacherId,
         originalTeacherName: teacherName,
         roomId: ap.roomId,
+        batch: ap.batch,
+        frequency: ap.frequency,
         status: 'Pending'
       };
     });
@@ -844,7 +853,7 @@ export default function App() {
       {/* Clean Footer */}
       <footer style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '16px 24px', textAlign: 'center', marginTop: 'auto' }}>
         <div style={{ fontWeight: 600, color: '#334155', fontSize: '13px' }}>
-          Springfield School Timetable & Substitution Desk &bull; 8 Periods &bull; 6 Working Days (Mon–Sat)
+          CM Shri, Yamuna Vihar Timetable & Substitution Desk &bull; 8 Periods &bull; 6 Working Days (Mon–Sat)
         </div>
         <div style={{ marginTop: '4px', fontSize: '12px', color: '#64748b' }}>
           {isAnonymous ? 'ANONYMOUS MODE ACTIVE' : 'STANDARD MODE'} &bull; Rest-Safe Algorithm Guaranteed &bull; Persistent Backend & Vercel Ready

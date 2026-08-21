@@ -1,5 +1,16 @@
 export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
 
+export type ScheduleFrequency =
+  | 'all'
+  | 'week_1_2'
+  | 'week_3_4'
+  | 'odd_weeks'
+  | 'even_weeks'
+  | 'week_1'
+  | 'week_2'
+  | 'week_3'
+  | 'week_4';
+
 export type UserRole = 'admin' | 'teacher' | 'student';
 
 export interface Teacher {
@@ -18,19 +29,12 @@ export interface ClassItem {
   grade: string; // e.g., '12'
   section: string; // e.g., 'A'
   academicYear: string; // e.g., '2026-27'
-  roomDefault?: string; // e.g., '204'
 }
 
 export interface Subject {
   id: string; // Code: 'PHY', 'MAT', 'CHEM', 'CS', 'ENG', 'BIO', 'PE', 'SOC'
   name: string; // 'Physics', 'Mathematics', 'Chemistry', 'CS', 'English', 'Biology'
   department: string; // 'Science', 'Mathematics', 'Languages', 'Social Studies', 'Sports'
-}
-
-export interface Room {
-  id: string; // '204', '205', '301', '102'
-  capacity: number; // 40
-  type: string; // 'Classroom', 'Laboratory', 'Computer Lab'
 }
 
 export interface TimetableEntry {
@@ -40,7 +44,8 @@ export interface TimetableEntry {
   classId: string; // '12-A'
   subjectId: string; // 'PHY'
   teacherId: string; // 'T001'
-  roomId: string; // '204'
+  batch?: string; // e.g., 'Whole Class', 'Batch 1 (CS)', 'Batch 2 (Bio)', 'Group A', 'Group B'
+  frequency?: ScheduleFrequency; // Occurrence: 'all', 'week_1_2', 'odd_weeks', etc.
 }
 
 export interface Absence {
@@ -59,8 +64,9 @@ export interface AffectedPeriod {
   classId: string;
   subjectId: string;
   subjectName: string;
-  roomId: string;
   day: DayOfWeek;
+  batch?: string;
+  frequency?: ScheduleFrequency;
 }
 
 export interface Substitution {
@@ -74,7 +80,8 @@ export interface Substitution {
   subjectName: string;
   originalTeacherId: string;
   originalTeacherName: string;
-  roomId: string;
+  batch?: string;
+  frequency?: ScheduleFrequency;
   status: 'Pending' | 'Assigned' | 'Cancelled';
   assignedSubstituteId?: string;
   assignedSubstituteName?: string;
@@ -99,4 +106,6 @@ export interface SubstituteRecommendation {
 export interface ConflictCheckResult {
   hasConflict: boolean;
   errorMessage: string | null;
+  isSplitElectiveNotice?: string | null;
 }
+

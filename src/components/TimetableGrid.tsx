@@ -4,16 +4,16 @@ import {
   Teacher,
   ClassItem,
   Subject,
-  Room,
   DayOfWeek
 } from '../types';
+import { getFrequencyLabel } from '../services/substitutionService';
+import { doFrequenciesOverlap } from '../services/conflictService';
 
 interface TimetableGridProps {
   entries: TimetableEntry[];
   teachers: Teacher[];
   classes: ClassItem[];
   subjects: Subject[];
-  rooms: Room[];
   isAnonymous?: boolean;
   onCellClick: (entry: Partial<TimetableEntry>) => void;
   onAddNew: () => void;
@@ -28,7 +28,6 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   teachers,
   classes,
   subjects,
-  rooms,
   isAnonymous = false,
   onCellClick,
   onAddNew,
@@ -36,7 +35,6 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
 }) => {
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
-  const [selectedRoom, setSelectedRoom] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<string>('all');
 
   const teacherMap = new Map(
@@ -47,78 +45,52 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   );
   const subjectMap = new Map(subjects.map((s) => [s.id, s.name]));
 
-  // Teacher double-booking audit: only flag if teaching 2 different classes at the same time
-  const { teacherConflicts, roomConflicts, duplicateCount } = useMemo(() => {
-    const teacherSlots = new Map<string, TimetableEntry[]>();
-    const roomSlots = new Map<string, TimetableEntry[]>();
-    const slotKeys = new Set<string>();
-    let dupes = 0;
-
-    entries.forEach((e) => {
-      const slotKey = `${e.classId}-${e.day}-${e.period}`;
-      if (slotKeys.has(slotKey)) {
-        dupes++;
-      } else {
-        slotKeys.add(slotKey);
-      }
-
-      const tKey = `${e.day}-P${e.period}-${e.teacherId}`;
-      const rKey = `${e.day}-P${e.period}-${e.roomId}`;
-
-      if (!teacherSlots.has(tKey)) teacherSlots.set(tKey, []);
-      teacherSlots.get(tKey)!.push(e);
-
-      if (!roomSlots.has(rKey)) roomSlots.set(rKey, []);
-      roomSlots.get(rKey)!.push(e);
-    });
-
+  // Teacher double-booking audit:
+  // Flags a conflict ONLY if a teacher is double-booked across DIFFERENT classes with overlapping frequency!
+  const teacherConflicts = useMemo(() => {
     const tConflicts: TimetableEntry[] = [];
-    teacherSlots.forEach((group) => {
-      // Check if distinct classes exist
-      const uniqueClasses = new Set(group.map(g => g.classId));
-      if (uniqueClasses.size > 1) {
-        tConflicts.push(...group);
-      }
-    });
 
-    const rConflicts: TimetableEntry[] = [];
-    roomSlots.forEach((group) => {
-      const uniqueClasses = new Set(group.map(g => g.classId));
-      if (uniqueClasses.size > 1) {
-        rConflicts.push(...group);
-      }
-    });
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const a = entries[i];
+        const b = entries[j];
 
-    return {
-      teacherConflicts: tConflicts,
-      roomConflicts: rConflicts,
-      duplicateCount: dupes
-    };
+        if (a.day === b.day && Number(a.period) === Number(b.period)) {
+          const overlaps = doFrequenciesOverlap(a.frequency || 'all', b.frequency || 'all');
+          if (!overlaps) continue;
+
+          // Teacher conflict: Same teacher in two different classes
+          if (a.teacherId === b.teacherId && a.classId !== b.classId) {
+            tConflicts.push(a, b);
+          }
+        }
+      }
+    }
+
+    return tConflicts;
   }, [entries]);
 
   const conflictingEntryIds = useMemo(() => {
     const set = new Set<string>();
     teacherConflicts.forEach((e) => set.add(e.id));
-    roomConflicts.forEach((e) => set.add(e.id));
     return set;
-  }, [teacherConflicts, roomConflicts]);
+  }, [teacherConflicts]);
 
   // Filter entries
   const filteredEntries = entries.filter((e) => {
     if (selectedClass !== 'all' && e.classId !== selectedClass) return false;
     if (selectedTeacher !== 'all' && e.teacherId !== selectedTeacher) return false;
-    if (selectedRoom !== 'all' && e.roomId !== selectedRoom) return false;
     if (selectedDay !== 'all' && e.day !== selectedDay) return false;
     return true;
   });
 
   const displayDays = selectedDay === 'all' ? DAYS : [selectedDay as DayOfWeek];
 
-  const getEntryFor = (day: DayOfWeek, period: number) => {
-    return filteredEntries.find((e) => e.day === day && Number(e.period) === Number(period));
+  const getEntriesFor = (day: DayOfWeek, period: number): TimetableEntry[] => {
+    return filteredEntries.filter((e) => e.day === day && Number(e.period) === Number(period));
   };
 
-  const totalIssueCount = teacherConflicts.length + duplicateCount;
+  const totalIssueCount = conflictingEntryIds.size;
 
   return (
     <div className="page-section" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
@@ -131,16 +103,16 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
             </h2>
             {totalIssueCount === 0 ? (
               <span style={{ fontSize: '12px', background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '20px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                🛡️ 0 Teacher Double-Bookings (Conflict-Free)
+                🛡️ 0 Double-Bookings (Conflict-Free & Parallel-Ready)
               </span>
             ) : (
               <span style={{ fontSize: '12px', background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '20px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                ⚠️ {totalIssueCount} Scheduling Conflicts / Duplicates Detected
+                ⚠️ {totalIssueCount} Double-Booking Conflicts Detected
               </span>
             )}
           </div>
           <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '13px' }}>
-            8 Periods / Day &bull; 6 Working Days (Mon–Sat) &bull; Click any cell to edit schedule
+            Supports Split Electives (e.g. CS / Bio in same period) &bull; Specific-Week Frequencies &bull; 8 Periods / Day &bull; 6 Working Days
           </p>
         </div>
 
@@ -235,25 +207,6 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
         </div>
 
         <div className="filter-group">
-          <label htmlFor="filter-room" style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginRight: '6px' }}>
-            Room:
-          </label>
-          <select
-            id="filter-room"
-            value={selectedRoom}
-            onChange={(e) => setSelectedRoom(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: 600 }}
-          >
-            <option value="all">All Rooms</option>
-            {rooms.map((r) => (
-              <option key={r.id} value={r.id}>
-                Room {r.id}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-group">
           <label htmlFor="filter-day" style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginRight: '6px' }}>
             Day:
           </label>
@@ -272,13 +225,12 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           </select>
         </div>
 
-        {(selectedClass !== 'all' || selectedTeacher !== 'all' || selectedRoom !== 'all' || selectedDay !== 'all') && (
+        {(selectedClass !== 'all' || selectedTeacher !== 'all' || selectedDay !== 'all') && (
           <button
             className="btn btn-outline btn-sm"
             onClick={() => {
               setSelectedClass('all');
               setSelectedTeacher('all');
-              setSelectedRoom('all');
               setSelectedDay('all');
             }}
             style={{ fontSize: '12px', padding: '5px 10px' }}
@@ -288,14 +240,14 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
         )}
       </div>
 
-      {/* Timetable Table */}
+      {/* Timetable Table with Split Elective & Frequency Badge Support */}
       <div className="table-responsive" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
             <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
               <th style={{ width: '110px', padding: '12px 14px', textAlign: 'left', fontWeight: 800 }}>Day</th>
               {PERIODS.map((p) => (
-                <th key={p} style={{ textAlign: 'center', minWidth: '115px', padding: '12px 8px', fontWeight: 800 }}>
+                <th key={p} style={{ textAlign: 'center', minWidth: '130px', padding: '12px 8px', fontWeight: 800 }}>
                   <div>Period {p}</div>
                 </th>
               ))}
@@ -304,45 +256,140 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           <tbody>
             {displayDays.map((day) => (
               <tr key={day} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '12px 14px', fontWeight: 800, color: '#1e293b', background: '#f8fafc' }}>
+                <td style={{ padding: '12px 14px', fontWeight: 800, color: '#1e293b', background: '#f8fafc', verticalAlign: 'top' }}>
                   {day}
                 </td>
                 {PERIODS.map((period) => {
-                  const entry = getEntryFor(day, period);
-                  if (entry) {
-                    const subjectName = subjectMap.get(entry.subjectId) || entry.subjectId;
-                    const teacherName = teacherMap.get(entry.teacherId) || entry.teacherId;
-                    const isConflicted = conflictingEntryIds.has(entry.id);
+                  const cellEntries = getEntriesFor(day, period);
+
+                  if (cellEntries.length > 0) {
+                    const hasConflict = cellEntries.some((e) => conflictingEntryIds.has(e.id));
+                    const isSplit = cellEntries.length > 1;
 
                     return (
                       <td
                         key={period}
-                        onClick={() => onCellClick(entry)}
-                        title={`Click to edit ${day} Period ${period}`}
                         style={{
-                          padding: '10px 8px',
+                          padding: '6px',
                           textAlign: 'center',
-                          cursor: 'pointer',
-                          backgroundColor: isConflicted ? '#fff1f2' : '#ffffff',
-                          border: isConflicted ? '2px solid #f87171' : '1px solid #e2e8f0',
+                          backgroundColor: hasConflict ? '#fff1f2' : isSplit ? '#f0fdfa' : '#ffffff',
+                          border: hasConflict ? '2px solid #f87171' : isSplit ? '1.5px solid #99f6e4' : '1px solid #e2e8f0',
                           borderRadius: '6px',
-                          transition: 'background 0.15s'
+                          verticalAlign: 'top'
                         }}
                       >
-                        {isConflicted && (
-                          <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: 800, marginBottom: '2px' }}>
+                        {hasConflict && (
+                          <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: 800, marginBottom: '4px' }}>
                             ⚠️ DOUBLE-BOOKED
                           </div>
                         )}
-                        <div style={{ fontWeight: 800, color: '#1e3a8a', fontSize: '13px' }}>
-                          {subjectName}
+
+                        {isSplit && (
+                          <div style={{ fontSize: '10px', color: '#0f766e', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                            <span>🔀</span> Split Class ({cellEntries.length} Batches)
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {cellEntries.map((entry) => {
+                            const subjectName = subjectMap.get(entry.subjectId) || entry.subjectId;
+                            const teacherName = teacherMap.get(entry.teacherId) || entry.teacherId;
+                            const isEntryConflicted = conflictingEntryIds.has(entry.id);
+
+                            return (
+                              <div
+                                key={entry.id}
+                                onClick={() => onCellClick(entry)}
+                                title={`Click to edit ${day} Period ${period} (${entry.batch || subjectName})`}
+                                style={{
+                                  padding: '6px 8px',
+                                  backgroundColor: isEntryConflicted ? '#fee2e2' : '#ffffff',
+                                  border: isEntryConflicted ? '1px solid #ef4444' : '1px solid #e2e8f0',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                                  transition: 'transform 0.1s, box-shadow 0.1s'
+                                }}
+                              >
+                                {entry.batch && (
+                                  <div
+                                    style={{
+                                      fontSize: '9.5px',
+                                      fontWeight: 800,
+                                      color: '#0369a1',
+                                      backgroundColor: '#e0f2fe',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      display: 'inline-block',
+                                      marginBottom: '2px'
+                                    }}
+                                  >
+                                    🏷️ {entry.batch}
+                                  </div>
+                                )}
+
+                                {entry.frequency && entry.frequency !== 'all' && (
+                                  <div
+                                    style={{
+                                      fontSize: '9.5px',
+                                      fontWeight: 700,
+                                      color: '#701a75',
+                                      backgroundColor: '#fdf4ff',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      display: 'inline-block',
+                                      marginBottom: '2px',
+                                      marginLeft: '3px'
+                                    }}
+                                    title={getFrequencyLabel(entry.frequency)}
+                                  >
+                                    📅 {getFrequencyLabel(entry.frequency).split(' ')[0]} {getFrequencyLabel(entry.frequency).split(' ')[1] || ''}
+                                  </div>
+                                )}
+
+                                <div style={{ fontWeight: 800, color: '#1e3a8a', fontSize: '12.5px' }}>
+                                  {subjectName}
+                                </div>
+                                <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#334155', marginTop: '1px' }}>
+                                  {teacherName}
+                                </div>
+                                {selectedClass === 'all' && (
+                                  <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '1px' }}>
+                                    Class {entry.classId}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
-                          {teacherName}
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                          {selectedClass === 'all' ? `[Class ${entry.classId}] ` : ''}Rm {entry.roomId}
-                        </div>
+
+                        {/* Quick Action: Add parallel batch for this class */}
+                        {selectedClass !== 'all' && (
+                          <div style={{ marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onCellClick({
+                                  day,
+                                  period,
+                                  classId: selectedClass,
+                                  batch: `Batch ${cellEntries.length + 1}`
+                                })
+                              }
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#0284c7',
+                                fontSize: '10.5px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                padding: '2px 4px'
+                              }}
+                            >
+                              + Split Batch
+                            </button>
+                          </div>
+                        )}
                       </td>
                     );
                   }
@@ -355,8 +402,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                           day,
                           period,
                           classId: selectedClass !== 'all' ? selectedClass : (classes[0]?.id || '9-A'),
-                          teacherId: selectedTeacher !== 'all' ? selectedTeacher : (teachers[0]?.id || 'T001'),
-                          roomId: selectedRoom !== 'all' ? selectedRoom : (rooms[0]?.id || '204')
+                          teacherId: selectedTeacher !== 'all' ? selectedTeacher : (teachers[0]?.id || 'T001')
                         })
                       }
                       title={`Click to schedule ${day} Period ${period}`}

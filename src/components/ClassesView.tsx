@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { ClassItem, Room } from '../types';
+import { ClassItem } from '../types';
 
 interface ClassesViewProps {
   classes: ClassItem[];
-  rooms: Room[];
   onSaveClass: (cls: ClassItem) => void;
   onDeleteClass: (id: string) => void;
 }
 
 export const ClassesView: React.FC<ClassesViewProps> = ({
   classes,
-  rooms,
   onSaveClass,
   onDeleteClass
 }) => {
@@ -22,8 +20,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
       id: '',
       grade: '12',
       section: 'A',
-      academicYear: '2026-27',
-      roomDefault: rooms[0]?.id || '204'
+      academicYear: '2026-27'
     });
     setIsModalOpen(true);
   };
@@ -41,8 +38,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
       id: finalId,
       grade: editingClass.grade,
       section: editingClass.section.toUpperCase(),
-      academicYear: editingClass.academicYear || '2026-27',
-      roomDefault: editingClass.roomDefault || '204'
+      academicYear: editingClass.academicYear || '2026-27'
     });
     setIsModalOpen(false);
     setEditingClass(null);
@@ -64,11 +60,10 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
         <table>
           <thead>
             <tr>
-              <th style={{ width: '100px' }}>Class</th>
+              <th style={{ width: '120px' }}>Class</th>
               <th>Section</th>
               <th>Grade</th>
               <th>Academic Year</th>
-              <th>Default Room</th>
               <th style={{ width: '130px', textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
@@ -81,7 +76,6 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                 <td>{cls.section}</td>
                 <td>Grade {cls.grade}</td>
                 <td>{cls.academicYear}</td>
-                <td>Room {cls.roomDefault || '204'}</td>
                 <td style={{ textAlign: 'center' }}>
                   <button
                     className="btn btn-outline btn-sm"
@@ -154,21 +148,6 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                     value={editingClass.academicYear || '2026-27'}
                     onChange={(e) => setEditingClass({ ...editingClass, academicYear: e.target.value })}
                   />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="cls-room">Default Assigned Room:</label>
-                  <select
-                    id="cls-room"
-                    value={editingClass.roomDefault || '204'}
-                    onChange={(e) => setEditingClass({ ...editingClass, roomDefault: e.target.value })}
-                  >
-                    {rooms.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        Room {r.id} ({r.type})
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
 

@@ -64,7 +64,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             </div>
             <div>
               <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                Springfield Timetable & Substitute Desk
+                CM Shri, Yamuna Vihar Timetable & Substitute Desk
                 <span style={{ fontSize: '11px', background: isSyncing ? '#fef3c7' : '#dcfce7', color: isSyncing ? '#92400e' : '#166534', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
                   {isSyncing ? '⏳ Cloud Syncing...' : '🟢 Live Multi-Device Sync'}
                 </span>

@@ -141,6 +141,16 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
                     </td>
                     <td>
                       <strong>{subName}</strong>
+                      {entry.batch && (
+                        <div style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600 }}>
+                          🏷️ {entry.batch}
+                        </div>
+                      )}
+                      {entry.frequency && entry.frequency !== 'all' && (
+                        <div style={{ fontSize: '10.5px', color: '#701a75' }}>
+                          📅 Specific Week Schedule
+                        </div>
+                      )}
                     </td>
                     <td>Class {entry.classId}</td>
                     <td>Room {entry.roomId}</td>

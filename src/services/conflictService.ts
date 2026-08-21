@@ -1,4 +1,55 @@
-import { TimetableEntry, Teacher, ClassItem, Room, Subject, ConflictCheckResult, Substitution, Absence } from '../types';
+import {
+  TimetableEntry,
+  Teacher,
+  ClassItem,
+  Subject,
+  ConflictCheckResult,
+  Substitution,
+  Absence,
+  ScheduleFrequency
+} from '../types';
+
+/**
+ * Checks if two schedule frequencies overlap in the same month.
+ * e.g. 'week_1_2' and 'week_3_4' do NOT overlap and can share the same slot without conflict!
+ */
+export function doFrequenciesOverlap(
+  freqA: ScheduleFrequency = 'all',
+  freqB: ScheduleFrequency = 'all'
+): boolean {
+  if (freqA === 'all' || freqB === 'all') return true;
+  if (freqA === freqB) return true;
+
+  const weeksForFreq = (f: ScheduleFrequency): Set<number> => {
+    switch (f) {
+      case 'week_1_2':
+        return new Set([1, 2]);
+      case 'week_3_4':
+        return new Set([3, 4]);
+      case 'odd_weeks':
+        return new Set([1, 3, 5]);
+      case 'even_weeks':
+        return new Set([2, 4]);
+      case 'week_1':
+        return new Set([1]);
+      case 'week_2':
+        return new Set([2]);
+      case 'week_3':
+        return new Set([3]);
+      case 'week_4':
+        return new Set([4]);
+      default:
+        return new Set([1, 2, 3, 4, 5]);
+    }
+  };
+
+  const setA = weeksForFreq(freqA);
+  const setB = weeksForFreq(freqB);
+  for (const w of setA) {
+    if (setB.has(w)) return true;
+  }
+  return false;
+}
 
 export function detectTimetableConflict(
   newEntry: {
@@ -8,69 +59,78 @@ export function detectTimetableConflict(
     classId: string;
     subjectId: string;
     teacherId: string;
-    roomId: string;
+    batch?: string;
+    frequency?: ScheduleFrequency;
   },
   existingEntries: TimetableEntry[],
   teachers: Teacher[],
   classes: ClassItem[],
-  rooms: Room[],
   subjects: Subject[]
 ): ConflictCheckResult {
-  const teacherMap = new Map(teachers.map(t => [t.id, t.name]));
-  const classMap = new Map(classes.map(c => [c.id, c.id]));
-  const roomMap = new Map(rooms.map(r => [r.id, r.id]));
-  const subjectMap = new Map(subjects.map(s => [s.id, s.name]));
+  const teacherMap = new Map(teachers.map((t) => [t.id, t.name]));
+  const classMap = new Map(classes.map((c) => [c.id, c.id]));
+  const subjectMap = new Map(subjects.map((s) => [s.id, s.name]));
 
   const teacherName = teacherMap.get(newEntry.teacherId) || newEntry.teacherId;
   const currentClassName = classMap.get(newEntry.classId) || newEntry.classId;
-  const currentRoomName = roomMap.get(newEntry.roomId) || newEntry.roomId;
+  const currentSubjectName = subjectMap.get(newEntry.subjectId) || newEntry.subjectId;
+
+  let splitElectiveNotice: string | null = null;
 
   for (const entry of existingEntries) {
-    // 1. Skip exact ID match
+    // 1. Skip exact ID match (editing self)
     if (newEntry.id && entry.id === newEntry.id) {
       continue;
     }
 
-    // 2. Skip if this is the exact same class slot being updated/replaced (prevent self-conflict)
-    if (
-      entry.classId === newEntry.classId &&
-      entry.day === newEntry.day &&
-      Number(entry.period) === Number(newEntry.period)
-    ) {
-      continue;
-    }
-
-    // Must be the same day and period for a collision
+    // Must match day and period to evaluate collision
     if (entry.day === newEntry.day && Number(entry.period) === Number(newEntry.period)) {
-      // 1. Teacher Conflict: Is the same teacher assigned in a DIFFERENT class during this period?
-      if (entry.teacherId === newEntry.teacherId && entry.classId !== newEntry.classId) {
-        const assignedClass = entry.classId;
-        return {
-          hasConflict: true,
-          errorMessage: `${teacherName} is already teaching Class ${assignedClass} during ${newEntry.day} Period ${newEntry.period}.`
-        };
+      // Check if frequencies overlap (e.g. 1st & 2nd Wed vs 3rd & 4th Wed never collide!)
+      const overlaps = doFrequenciesOverlap(newEntry.frequency || 'all', entry.frequency || 'all');
+      if (!overlaps) {
+        continue;
       }
 
-      // 2. Room Conflict: Is this room already occupied by a DIFFERENT class?
-      if (entry.roomId === newEntry.roomId && entry.classId !== newEntry.classId) {
-        const occupyingClass = entry.classId;
-        return {
-          hasConflict: true,
-          errorMessage: `Room ${currentRoomName} is already occupied by Class ${occupyingClass} during ${newEntry.day} Period ${newEntry.period}.`
-        };
+      // 1. Teacher Conflict: Is the same teacher assigned in a DIFFERENT class OR duplicate in same class?
+      if (entry.teacherId === newEntry.teacherId) {
+        if (entry.classId !== newEntry.classId) {
+          return {
+            hasConflict: true,
+            errorMessage: `${teacherName} is already teaching Class ${entry.classId} during ${newEntry.day} Period ${newEntry.period}.`,
+            isSplitElectiveNotice: null
+          };
+        } else if (entry.subjectId === newEntry.subjectId && (entry.batch || '') === (newEntry.batch || '')) {
+          // Exactly identical teacher + class + subject + batch
+          return {
+            hasConflict: true,
+            errorMessage: `${teacherName} is already scheduled for ${currentSubjectName} in Class ${currentClassName} Period ${newEntry.period}.`,
+            isSplitElectiveNotice: null
+          };
+        }
+      }
+
+      // 2. Same Class & Period: Parallel / Split Elective Batch detection
+      if (entry.classId === newEntry.classId) {
+        const otherSubject = subjectMap.get(entry.subjectId) || entry.subjectId;
+        const otherTeacher = teacherMap.get(entry.teacherId) || entry.teacherId;
+        const otherBatch = entry.batch ? `[${entry.batch}] ` : '';
+
+        splitElectiveNotice = `Parallel Elective / Split Class: Class ${currentClassName} also runs ${otherBatch}${otherSubject} (${otherTeacher}) during Period ${newEntry.period}. Both batches will take place in parallel.`;
       }
     }
   }
 
   return {
     hasConflict: false,
-    errorMessage: null
+    errorMessage: null,
+    isSplitElectiveNotice: splitElectiveNotice
   };
 }
 
 /**
- * Deduplicate timetable entries: ensures exactly one entry exists per (classId + day + period).
- * Returns the cleaned array and the list of deleted duplicate IDs so they can be purged from Firestore.
+ * Deduplicate timetable entries:
+ * Unique key includes classId + day + period + (batch || subjectId) + teacherId + frequency.
+ * This guarantees split electives (e.g. 11-A CS and 11-A Bio) or alternating week sessions are preserved!
  */
 export function deduplicateTimetable(entries: TimetableEntry[]): {
   cleaned: TimetableEntry[];
@@ -80,7 +140,15 @@ export function deduplicateTimetable(entries: TimetableEntry[]): {
   const removedIds: string[] = [];
 
   for (const e of entries) {
-    const key = `${e.classId.trim().toLowerCase()}_${e.day.trim().toLowerCase()}_${Number(e.period)}`;
+    const classKey = e.classId.trim().toLowerCase();
+    const dayKey = e.day.trim().toLowerCase();
+    const periodKey = Number(e.period);
+    const batchKey = (e.batch || e.subjectId).trim().toLowerCase();
+    const teacherKey = e.teacherId.trim().toLowerCase();
+    const freqKey = (e.frequency || 'all').toLowerCase();
+
+    const key = `${classKey}_${dayKey}_${periodKey}_${batchKey}_${teacherKey}_${freqKey}`;
+
     if (map.has(key)) {
       const existing = map.get(key)!;
       // Mark older one for removal
@@ -101,7 +169,7 @@ export function deduplicateTimetable(entries: TimetableEntry[]): {
  * Deduplicate and sanitize substitutions:
  * 1. Removes any substitutions for teachers no longer in directory
  * 2. Removes any orphan substitutions where the teacher is not marked absent on that date
- * 3. Deduplicates per (date + period + classId) so each period slot only appears once
+ * 3. Deduplicates per (date + period + classId + (batch || subjectId) + originalTeacherId)
  * 4. Sanitizes substitute assignments if the assigned substitute was deleted
  */
 export function deduplicateSubstitutions(
@@ -136,8 +204,9 @@ export function deduplicateSubstitutions(
       continue;
     }
 
-    // Key by (date + period + classId)
-    const slotKey = `${s.date}_P${Number(s.period)}_${s.classId.trim().toLowerCase()}`;
+    // Key by (date + period + classId + batchOrSubject + originalTeacherId)
+    const batchOrSub = (s.batch || s.subjectId).trim().toLowerCase();
+    const slotKey = `${s.date}_P${Number(s.period)}_${s.classId.trim().toLowerCase()}_${batchOrSub}_${s.originalTeacherId.trim().toLowerCase()}`;
 
     // Ensure teacher names are up-to-date with directory
     const currentOrigName = teacherNameMap.get(s.originalTeacherId) || s.originalTeacherName;
@@ -218,4 +287,5 @@ export function deduplicateAbsences(
     removedIds
   };
 }
+
 

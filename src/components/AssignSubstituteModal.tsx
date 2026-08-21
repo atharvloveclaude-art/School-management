@@ -153,10 +153,15 @@ export const AssignSubstituteModal: React.FC<AssignSubstituteModalProps> = ({
             }}
           >
             <div>
-              <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Class & Room</span>
+              <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Class</span>
               <strong style={{ fontSize: '15px', color: '#1e293b' }}>
-                Class {substitution.classId} &bull; Room {substitution.roomId}
+                Class {substitution.classId}
               </strong>
+              {substitution.batch && (
+                <div style={{ fontSize: '11px', color: '#0284c7', fontWeight: 700, marginTop: '2px' }}>
+                  🏷️ {substitution.batch}
+                </div>
+              )}
             </div>
 
             <div>
@@ -164,6 +169,11 @@ export const AssignSubstituteModal: React.FC<AssignSubstituteModalProps> = ({
               <strong style={{ fontSize: '15px', color: '#1e293b' }}>
                 Period {substitution.period} ({timing})
               </strong>
+              {substitution.frequency && substitution.frequency !== 'all' && (
+                <div style={{ fontSize: '11px', color: '#701a75', fontWeight: 600, marginTop: '2px' }}>
+                  📅 Fortnightly / Active Week
+                </div>
+              )}
             </div>
 
             <div>

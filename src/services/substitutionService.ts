@@ -5,7 +5,9 @@ import {
   Absence,
   Substitution,
   SubstituteRecommendation,
-  DayOfWeek
+  DayOfWeek,
+  ScheduleFrequency,
+  AffectedPeriod
 } from '../types';
 
 /**
@@ -21,6 +23,75 @@ export const PERIOD_TIMINGS: Record<number, string> = {
   7: '02:20 – 03:05 PM',
   8: '03:10 – 03:55 PM'
 };
+
+/**
+ * Helper to determine which week/occurrence of the month a date belongs to (1, 2, 3, 4, or 5).
+ * e.g., Day 1-7 is 1st occurrence (1st Wednesday), Day 8-14 is 2nd occurrence (2nd Wednesday).
+ */
+export function getOccurrenceWeekOfMonth(dateStr: string): number {
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return 1;
+  const day = parseInt(parts[2], 10) || 1;
+  return Math.ceil(day / 7);
+}
+
+/**
+ * Checks if a timetable slot or schedule frequency is active on a specific date.
+ */
+export function isScheduleActiveOnDate(
+  frequency: ScheduleFrequency | undefined,
+  dateStr: string
+): boolean {
+  if (!frequency || frequency === 'all') return true;
+  const week = getOccurrenceWeekOfMonth(dateStr);
+  switch (frequency) {
+    case 'week_1_2':
+      return week === 1 || week === 2;
+    case 'week_3_4':
+      return week === 3 || week === 4;
+    case 'odd_weeks':
+      return week % 2 === 1; // 1st, 3rd, 5th
+    case 'even_weeks':
+      return week % 2 === 0; // 2nd, 4th
+    case 'week_1':
+      return week === 1;
+    case 'week_2':
+      return week === 2;
+    case 'week_3':
+      return week === 3;
+    case 'week_4':
+      return week === 4;
+    default:
+      return true;
+  }
+}
+
+/**
+ * Human-readable label for a schedule frequency
+ */
+export function getFrequencyLabel(frequency?: ScheduleFrequency): string {
+  switch (frequency) {
+    case 'week_1_2':
+      return '1st & 2nd Week of Month';
+    case 'week_3_4':
+      return '3rd & 4th Week of Month';
+    case 'odd_weeks':
+      return '1st & 3rd Week (Odd Weeks)';
+    case 'even_weeks':
+      return '2nd & 4th Week (Even Weeks)';
+    case 'week_1':
+      return '1st Week of Month';
+    case 'week_2':
+      return '2nd Week of Month';
+    case 'week_3':
+      return '3rd Week of Month';
+    case 'week_4':
+      return '4th Week of Month';
+    case 'all':
+    default:
+      return 'Every Week';
+  }
+}
 
 /**
  * Calculates teacher's schedule and consecutive periods on a given date/day.
@@ -42,9 +113,9 @@ export function getTeacherWorkloadInfo(
   hasAdequateRest: boolean;
   restPeriodsRemaining: number;
 } {
-  // 1. Regular timetable periods for this teacher on this day of week
+  // 1. Regular timetable periods for this teacher on this day of week (filtered by active frequency on date)
   const regularPeriods = timetables
-    .filter((t) => t.day === day && t.teacherId === teacherId)
+    .filter((t) => t.day === day && t.teacherId === teacherId && isScheduleActiveOnDate(t.frequency, date))
     .map((t) => Number(t.period));
 
   // 2. Already assigned substitution periods for this teacher on this date
@@ -127,10 +198,15 @@ export function getRecommendedSubstitutes(
       .map((a) => a.teacherId)
   );
 
-  // 2. Teachers busy teaching a regular class during this day & period
+  // 2. Teachers busy teaching a regular class during this day & period (active on this date)
   const busyRegularTeacherIds = new Set(
     timetables
-      .filter((t) => t.day === substitution.day && Number(t.period) === Number(substitution.period))
+      .filter(
+        (t) =>
+          t.day === substitution.day &&
+          Number(t.period) === Number(substitution.period) &&
+          isScheduleActiveOnDate(t.frequency, substitution.date)
+      )
       .map((t) => t.teacherId)
   );
 
@@ -166,84 +242,63 @@ export function getRecommendedSubstitutes(
       substitution.date,
       timetables,
       substitutions,
-      substitution.period
+      Number(substitution.period)
     );
 
-    // REST RULE ENFORCEMENT:
-    // 1. Cannot be absent or double-booked at Period P
-    // 2. Must NOT get 4 consecutive periods (give them rest!)
-    // 3. Must not exceed maximum daily periods (max 5-6 out of 8 to ensure rest intervals)
-    const isOverworked = workload.wouldCause4Consecutive || workload.totalPeriodsToday > 5;
     const isAvailable = !isAbsent && !isBusyRegular && !isBusySub && !workload.wouldCause4Consecutive;
 
     const teacherDept = (teacher.department || '').toLowerCase();
     const teacherSubj = (teacher.primarySubject || '').toLowerCase();
 
-    // Check exact or partial subject match
+    // Matching criteria
     const subjectMatch =
-      (teacherSubj && (teacherSubj.includes(targetSubjectName) || targetSubjectName.includes(teacherSubj))) ||
-      (teacherDept && teacherDept.includes(targetSubjectName));
-
-    // Check department match
+      teacherSubj === targetSubjectName ||
+      (targetSubjectName.length > 2 && teacherSubj.includes(targetSubjectName.slice(0, 3)));
     const departmentMatch =
-      !subjectMatch &&
-      ((teacherDept && targetDepartment && (teacherDept.includes(targetDepartment) || targetDepartment.includes(teacherDept))) ||
-        (targetDepartment === 'science' &&
-          (teacherDept.includes('physics') || teacherDept.includes('chemistry') || teacherDept.includes('biology'))));
+      teacherDept === targetDepartment ||
+      (targetDepartment.length > 2 && teacherDept.includes(targetDepartment.slice(0, 3)));
 
-    let score = 50; // base score for being free
+    let score = 0;
     const reasonParts: string[] = [];
 
-    if (!isAvailable) {
-      score = 0;
-      if (isAbsent) {
-        reasonParts.push('Absent today');
-      } else if (isBusyRegular) {
-        reasonParts.push(`Teaching regular class in Period ${substitution.period}`);
-      } else if (isBusySub) {
-        reasonParts.push(`Already on cover duty in Period ${substitution.period}`);
-      } else if (workload.wouldCause4Consecutive) {
-        reasonParts.push(`Rest Protection: Would cause 4 consecutive periods without break (Rest required)`);
-      }
+    if (isAbsent) {
+      reasonParts.push('Absent today');
+    } else if (isBusyRegular) {
+      reasonParts.push(`Teaching regular class (Period ${substitution.period})`);
+    } else if (isBusySub) {
+      reasonParts.push(`Assigned to another cover duty (Period ${substitution.period})`);
+    } else if (workload.wouldCause4Consecutive) {
+      reasonParts.push('Rest rule: Would exceed 3 consecutive periods');
     } else {
-      // Score boost for subject / department alignment
+      score = 40; // Base score for available
+
       if (subjectMatch) {
-        score += 38;
-        reasonParts.push(`Subject Specialist (${teacher.primarySubject || teacher.department})`);
+        score += 35;
+        reasonParts.push(`Same subject specialist (${targetSubject?.name || 'Subject'})`);
       } else if (departmentMatch) {
-        score += 20;
+        score += 25;
         reasonParts.push(`${teacher.department} Department Faculty`);
       } else {
-        reasonParts.push(`Free Period ${substitution.period}`);
+        score += 10;
+        reasonParts.push('Free period available');
       }
 
-      // Rest & Workload balancing score adjustments:
-      if (workload.maxConsecutive === 1) {
-        // Great rest spacing: isolated single period with rest before and after
+      // Workload balancing
+      if (workload.scheduledPeriods.length <= 2) {
+        score += 15;
+        reasonParts.push('Light daily load');
+      } else if (workload.scheduledPeriods.length <= 4) {
         score += 8;
-        reasonParts.push('Optimal rest interval');
-      } else if (workload.maxConsecutive === 2) {
-        // 2 consecutive periods: normal and healthy
-        score += 4;
-      } else if (workload.maxConsecutive === 3) {
-        // 3 consecutive periods: acceptable, but lower preference to protect teacher stamina
-        score -= 10;
-        reasonParts.push('3 consecutive periods (will need rest after)');
+        reasonParts.push('Moderate load');
       }
 
-      // Preference for teachers with fewer total classes today
-      if (workload.totalPeriodsToday <= 3) {
-        score += 6;
-        reasonParts.push(`Light daily load (${workload.totalPeriodsToday}/8 periods)`);
-      } else if (workload.totalPeriodsToday === 4) {
-        score += 2;
-      } else if (workload.totalPeriodsToday === 5) {
-        score -= 8;
-        reasonParts.push(`Moderate load (${workload.totalPeriodsToday}/8 periods)`);
+      if (workload.maxConsecutive <= 2) {
+        score += 10;
+        reasonParts.push('Optimal rest interval');
       }
     }
 
-    const finalScore = isAvailable ? Math.min(99, Math.max(10, score)) : 0;
+    const finalScore = Math.max(0, Math.min(100, score));
 
     recommendations.push({
       teacher,
@@ -273,44 +328,48 @@ export function getRecommendedSubstitutes(
 }
 
 /**
- * Finds all classes taught by an absent teacher on a given day.
- * Deduplicates by period so that each period produces at most 1 substitution requirement.
+ * Finds all classes taught by an absent teacher on a given day/date.
+ * Filters by active frequency (e.g. 1st & 2nd Wednesday) and preserves batch groups.
  */
 export function findAffectedPeriods(
   teacherId: string,
   day: DayOfWeek,
   timetables: TimetableEntry[],
-  subjects: Subject[]
-) {
+  subjects: Subject[],
+  date?: string
+): AffectedPeriod[] {
   const subjectMap = new Map(subjects.map((s) => [s.id, s.name]));
-  const periodMap = new Map<number, {
-    period: number;
-    classId: string;
-    subjectId: string;
-    subjectName: string;
-    roomId: string;
-    day: DayOfWeek;
-  }>();
 
+  // Filter timetable for this teacher and day
   const teacherTimetable = timetables
-    .filter((t) => t.teacherId === teacherId && t.day === day)
+    .filter((t) => {
+      if (t.teacherId !== teacherId || t.day !== day) return false;
+      if (date && !isScheduleActiveOnDate(t.frequency, date)) return false;
+      return true;
+    })
     .sort((a, b) => Number(a.period) - Number(b.period));
+
+  const result: AffectedPeriod[] = [];
+  const seenKey = new Set<string>();
 
   for (const entry of teacherTimetable) {
     const p = Number(entry.period);
-    if (!periodMap.has(p)) {
-      periodMap.set(p, {
+    const key = `${p}_${entry.classId}_${entry.batch || ''}_${entry.subjectId}`;
+    if (!seenKey.has(key)) {
+      seenKey.add(key);
+      result.push({
         period: p,
         classId: entry.classId,
         subjectId: entry.subjectId,
         subjectName: subjectMap.get(entry.subjectId) || entry.subjectId,
-        roomId: entry.roomId,
-        day: entry.day
+        day: entry.day,
+        batch: entry.batch,
+        frequency: entry.frequency
       });
     }
   }
 
-  return Array.from(periodMap.values()).sort((a, b) => a.period - b.period);
+  return result.sort((a, b) => a.period - b.period);
 }
 
 /**

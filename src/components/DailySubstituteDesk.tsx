@@ -1,42 +1,61 @@
 import React, { useState } from 'react';
-import { Teacher, ClassItem, Subject, TimetableEntry, Absence, Substitution, AffectedPeriod } from '../types';
-import { findAffectedPeriods, getDayOfWeekFromDate, autoAssignSubstitutions } from '../services/substitutionService';
+import {
+  Teacher,
+  Absence,
+  Substitution,
+  TimetableEntry,
+  Subject,
+  ClassItem,
+  AffectedPeriod
+} from '../types';
+import {
+  getDayOfWeekFromDate,
+  findAffectedPeriods,
+  getOccurrenceWeekOfMonth,
+  getFrequencyLabel
+} from '../services/substitutionService';
 import { DutySlipModal } from './DutySlipModal';
 
 interface DailySubstituteDeskProps {
   teachers: Teacher[];
-  classes: ClassItem[];
-  subjects: Subject[];
   timetables: TimetableEntry[];
+  subjects: Subject[];
+  classes: ClassItem[];
   absences: Absence[];
   substitutions: Substitution[];
-  isAnonymous: boolean;
-  onMarkAbsent: (teacherId: string, teacherName: string, date: string, reason: string, affectedPeriods: AffectedPeriod[]) => void;
+  isAnonymous?: boolean;
+  onMarkAbsent: (
+    teacherId: string,
+    teacherName: string,
+    date: string,
+    reason: string,
+    affectedPeriods: AffectedPeriod[]
+  ) => void;
   onRemoveAbsence: (absenceId: string) => void;
   onClearDateAbsences?: (date: string) => void;
-  onDeleteSubstitution?: (subId: string) => void;
+  onDeleteSubstitution?: (substitutionId: string) => void;
+  onUnassignSubstitute: (substitutionId: string) => void;
   onCleanDuplicates?: () => void;
-  onAssignSubstitute: (sub: Substitution) => void;
-  onUnassignSubstitute: (subId: string) => void;
+  onAssignSubstitute: (substitution: Substitution) => void;
   onAutoAssignAll: () => void;
-  onOpenPrintModal: (date?: string) => void;
+  onOpenPrintModal: (date: string) => void;
 }
 
 export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
   teachers,
-  classes,
-  subjects,
   timetables,
+  subjects,
+  classes,
   absences,
   substitutions,
-  isAnonymous,
+  isAnonymous = false,
   onMarkAbsent,
   onRemoveAbsence,
   onClearDateAbsences,
   onDeleteSubstitution,
+  onUnassignSubstitute,
   onCleanDuplicates,
   onAssignSubstitute,
-  onUnassignSubstitute,
   onAutoAssignAll,
   onOpenPrintModal
 }) => {
@@ -47,6 +66,8 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
   const [activeDutySlip, setActiveDutySlip] = useState<Substitution | null>(null);
 
   const dayOfWeek = getDayOfWeekFromDate(selectedDate);
+  const weekNumber = getOccurrenceWeekOfMonth(selectedDate);
+  const weekOrdinal = weekNumber === 1 ? '1st' : weekNumber === 2 ? '2nd' : weekNumber === 3 ? '3rd' : `${weekNumber}th`;
 
   // Validate against current teacher directory: exclude mock/deleted teachers
   const validTeacherIdSet = new Set(teachers.map((t) => t.id));
@@ -71,7 +92,8 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
     const teacher = teachers.find((t) => t.id === selectedTeacherId);
     if (!teacher) return;
 
-    const affected = findAffectedPeriods(teacher.id, dayOfWeek, timetables, subjects);
+    // Filter by selectedDate so week-specific frequencies (e.g. 1st & 2nd Wed) are correctly evaluated
+    const affected = findAffectedPeriods(teacher.id, dayOfWeek, timetables, subjects, selectedDate);
     const finalReason = reason === 'Other' ? (customReason.trim() || 'Excused Leave') : reason;
 
     onMarkAbsent(
@@ -88,14 +110,14 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
 
   const getPeriodTime = (p: number): string => {
     const times: Record<number, string> = {
-      1: '08:00 - 08:50',
-      2: '08:50 - 09:40',
-      3: '09:55 - 10:45',
-      4: '10:45 - 11:35',
-      5: '12:15 - 01:05',
-      6: '01:05 - 01:55',
-      7: '02:05 - 02:55',
-      8: '02:55 - 03:45'
+      1: '08:30 - 09:15 AM',
+      2: '09:20 - 10:05 AM',
+      3: '10:20 - 11:05 AM',
+      4: '11:10 - 11:55 AM',
+      5: '12:40 - 01:25 PM',
+      6: '01:30 - 02:15 PM',
+      7: '02:20 - 03:05 PM',
+      8: '03:10 - 03:55 PM'
     };
     return times[p] || `Period ${p}`;
   };
@@ -116,7 +138,7 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
-              ⚡ Daily Substitute Center
+              ⚡ Daily Substitute Center &bull; Split Classes & Fortnightly Schedule Ready
             </div>
             <h1 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
               Substitutions & Cover Roster
@@ -144,7 +166,7 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
                 }}
               />
               <span style={{ fontSize: '12px', background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                {dayOfWeek}
+                {dayOfWeek} ({weekOrdinal} {dayOfWeek.slice(0, 3)})
               </span>
             </div>
 
@@ -212,13 +234,13 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
               <span style={{ background: '#fee2e2', color: '#dc2626', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '14px' }}>1</span>
               <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Mark Absent Teacher</h2>
             </div>
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{dayOfWeek}</span>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{dayOfWeek} ({weekOrdinal} wk)</span>
           </div>
 
           <form onSubmit={handleAddAbsence}>
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Select Teacher:
+                Select Absent Teacher:
               </label>
               <select
                 value={selectedTeacherId}
@@ -483,8 +505,8 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
                     <th style={{ padding: '10px 12px', fontWeight: 700 }}>Period & Time</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 700 }}>Class & Room</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 700 }}>Subject</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700 }}>Class</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700 }}>Subject & Batch</th>
                     <th style={{ padding: '10px 12px', fontWeight: 700 }}>Absent Teacher</th>
                     <th style={{ padding: '10px 12px', fontWeight: 700 }}>Substituted Teacher (Cover)</th>
                     <th style={{ padding: '10px 12px', fontWeight: 700 }}>Status</th>
@@ -516,17 +538,28 @@ export const DailySubstituteDesk: React.FC<DailySubstituteDeskProps> = ({
                             </div>
                           </td>
 
-                          {/* Class & Room */}
+                          {/* Class */}
                           <td style={{ padding: '12px' }}>
                             <div style={{ fontWeight: 700, color: '#1e293b' }}>Class {sub.classId}</div>
-                            <div style={{ fontSize: '11px', color: '#64748b' }}>Room {sub.roomId}</div>
                           </td>
 
-                          {/* Subject */}
+                          {/* Subject & Batch */}
                           <td style={{ padding: '12px' }}>
-                            <span style={{ fontWeight: 600, color: '#0f172a', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px' }}>
-                              {sub.subjectName || sub.subjectId}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontWeight: 700, color: '#0f172a', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                                {sub.subjectName || sub.subjectId}
+                              </span>
+                              {sub.batch && (
+                                <span style={{ fontSize: '10.5px', color: '#0369a1', fontWeight: 700, background: '#e0f2fe', padding: '1px 5px', borderRadius: '3px' }}>
+                                  🏷️ {sub.batch}
+                                </span>
+                              )}
+                              {sub.frequency && sub.frequency !== 'all' && (
+                                <span style={{ fontSize: '10px', color: '#701a75', fontWeight: 600 }}>
+                                  📅 {getFrequencyLabel(sub.frequency)}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Absent Teacher */}

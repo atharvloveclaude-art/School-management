@@ -14,7 +14,6 @@ import {
   Teacher,
   ClassItem,
   Subject,
-  Room,
   TimetableEntry,
   Absence,
   Substitution
@@ -34,14 +33,14 @@ export const INITIAL_TEACHERS: Teacher[] = [
 ];
 
 export const INITIAL_CLASSES: ClassItem[] = [
-  { id: '9-A', grade: '9', section: 'A', academicYear: '2026-27', roomDefault: 'Rm 6' },
-  { id: '9-B', grade: '9', section: 'B', academicYear: '2026-27', roomDefault: 'Rm 7' },
-  { id: '10-A', grade: '10', section: 'A', academicYear: '2026-27', roomDefault: '204' },
-  { id: '10-C', grade: '10', section: 'C', academicYear: '2026-27', roomDefault: '301' },
-  { id: '11-A', grade: '11', section: 'A', academicYear: '2026-27', roomDefault: '102' },
-  { id: '11-B', grade: '11', section: 'B', academicYear: '2026-27', roomDefault: '205' },
-  { id: '12-A', grade: '12', section: 'A', academicYear: '2026-27', roomDefault: '204' },
-  { id: '12-B', grade: '12', section: 'B', academicYear: '2026-27', roomDefault: '301' }
+  { id: '9-A', grade: '9', section: 'A', academicYear: '2026-27' },
+  { id: '9-B', grade: '9', section: 'B', academicYear: '2026-27' },
+  { id: '10-A', grade: '10', section: 'A', academicYear: '2026-27' },
+  { id: '10-C', grade: '10', section: 'C', academicYear: '2026-27' },
+  { id: '11-A', grade: '11', section: 'A', academicYear: '2026-27' },
+  { id: '11-B', grade: '11', section: 'B', academicYear: '2026-27' },
+  { id: '12-A', grade: '12', section: 'A', academicYear: '2026-27' },
+  { id: '12-B', grade: '12', section: 'B', academicYear: '2026-27' }
 ];
 
 export const INITIAL_SUBJECTS: Subject[] = [
@@ -62,26 +61,15 @@ export const INITIAL_SUBJECTS: Subject[] = [
   { id: 'NEEV', name: 'NEEV', department: 'Foundation' }
 ];
 
-export const INITIAL_ROOMS: Room[] = [
-  { id: 'Rm 6', capacity: 40, type: 'Classroom' },
-  { id: 'Rm 7', capacity: 40, type: 'Classroom' },
-  { id: '204', capacity: 40, type: 'Classroom' },
-  { id: '205', capacity: 35, type: 'Laboratory' },
-  { id: '301', capacity: 50, type: 'Classroom' },
-  { id: '102', capacity: 40, type: 'Classroom' },
-  { id: 'LAB-1', capacity: 30, type: 'Computer Lab' },
-  { id: 'BIO-LAB', capacity: 35, type: 'Biology Lab' }
-];
-
 export const INITIAL_TIMETABLE: TimetableEntry[] = [
-  { id: 'tt-12a-mon-1', day: 'Monday', period: 1, classId: '12-A', subjectId: 'PHY', teacherId: 'T001', roomId: '204' },
-  { id: 'tt-12a-mon-2', day: 'Monday', period: 2, classId: '12-A', subjectId: 'PHY', teacherId: 'T001', roomId: '204' },
-  { id: 'tt-12a-mon-3', day: 'Monday', period: 3, classId: '12-A', subjectId: 'ENG', teacherId: 'T007', roomId: '204' },
-  { id: 'tt-12a-mon-4', day: 'Monday', period: 4, classId: '12-A', subjectId: 'CHEM', teacherId: 'T003', roomId: '205' },
-  { id: 'tt-12a-mon-5', day: 'Monday', period: 5, classId: '12-A', subjectId: 'CS', teacherId: 'T006', roomId: 'LAB-1' },
-  { id: 'tt-12a-mon-6', day: 'Monday', period: 6, classId: '12-A', subjectId: 'MAT', teacherId: 'T002', roomId: '204' },
-  { id: 'tt-12a-mon-7', day: 'Monday', period: 7, classId: '12-A', subjectId: 'BIO', teacherId: 'T005', roomId: 'BIO-LAB' },
-  { id: 'tt-12a-mon-8', day: 'Monday', period: 8, classId: '12-A', subjectId: 'PE', teacherId: 'T008', roomId: '204' }
+  { id: 'tt-12a-mon-1', day: 'Monday', period: 1, classId: '12-A', subjectId: 'PHY', teacherId: 'T001' },
+  { id: 'tt-12a-mon-2', day: 'Monday', period: 2, classId: '12-A', subjectId: 'PHY', teacherId: 'T001' },
+  { id: 'tt-12a-mon-3', day: 'Monday', period: 3, classId: '12-A', subjectId: 'ENG', teacherId: 'T007' },
+  { id: 'tt-12a-mon-4', day: 'Monday', period: 4, classId: '12-A', subjectId: 'CHEM', teacherId: 'T003' },
+  { id: 'tt-12a-mon-5', day: 'Monday', period: 5, classId: '12-A', subjectId: 'CS', teacherId: 'T006' },
+  { id: 'tt-12a-mon-6', day: 'Monday', period: 6, classId: '12-A', subjectId: 'MAT', teacherId: 'T002' },
+  { id: 'tt-12a-mon-7', day: 'Monday', period: 7, classId: '12-A', subjectId: 'BIO', teacherId: 'T005' },
+  { id: 'tt-12a-mon-8', day: 'Monday', period: 8, classId: '12-A', subjectId: 'PE', teacherId: 'T008' }
 ];
 
 export const INITIAL_ABSENCES: Absence[] = [];
@@ -94,7 +82,6 @@ export interface AppDataState {
   teachers: Teacher[];
   classes: ClassItem[];
   subjects: Subject[];
-  rooms: Room[];
   timetables: TimetableEntry[];
   absences: Absence[];
   substitutions: Substitution[];
@@ -117,7 +104,6 @@ export function getInitialLocalData(): AppDataState {
     teachers: INITIAL_TEACHERS,
     classes: INITIAL_CLASSES,
     subjects: INITIAL_SUBJECTS,
-    rooms: INITIAL_ROOMS,
     timetables: INITIAL_TIMETABLE,
     absences: INITIAL_ABSENCES,
     substitutions: INITIAL_SUBSTITUTIONS
@@ -156,11 +142,10 @@ export async function syncToBackendAPI(data: AppDataState): Promise<boolean> {
 export async function fetchFullAppData(): Promise<AppDataState> {
   // Layer 1: Pull live documents from all individual Firestore collections
   try {
-    const [tSnap, cSnap, sSnap, rSnap, ttSnap, abSnap, subSnap] = await Promise.all([
+    const [tSnap, cSnap, sSnap, ttSnap, abSnap, subSnap] = await Promise.all([
       getDocs(collection(db, 'teachers')).catch(() => null),
       getDocs(collection(db, 'classes')).catch(() => null),
       getDocs(collection(db, 'subjects')).catch(() => null),
-      getDocs(collection(db, 'rooms')).catch(() => null),
       getDocs(collection(db, 'timetables')).catch(() => null),
       getDocs(collection(db, 'absences')).catch(() => null),
       getDocs(collection(db, 'substitutions')).catch(() => null),
@@ -185,10 +170,6 @@ export async function fetchFullAppData(): Promise<AppDataState> {
         ? sSnap.docs.map(d => ({ ...d.data(), id: d.id } as Subject))
         : INITIAL_SUBJECTS;
 
-      const rooms = (rSnap && !rSnap.empty)
-        ? rSnap.docs.map(d => ({ ...d.data(), id: d.id } as Room))
-        : INITIAL_ROOMS;
-
       const timetables = (ttSnap && !ttSnap.empty)
         ? ttSnap.docs.map(d => ({ ...d.data(), id: d.id } as TimetableEntry))
         : INITIAL_TIMETABLE;
@@ -205,7 +186,6 @@ export async function fetchFullAppData(): Promise<AppDataState> {
         teachers,
         classes,
         subjects,
-        rooms,
         timetables,
         absences,
         substitutions
@@ -272,9 +252,6 @@ export async function pushFullStateToCloud(data: AppDataState): Promise<boolean>
     data.subjects.forEach((s) => {
       batch.set(doc(db, 'subjects', s.id), s);
     });
-    data.rooms.forEach((r) => {
-      batch.set(doc(db, 'rooms', r.id), r);
-    });
     data.timetables.forEach((tt) => {
       batch.set(doc(db, 'timetables', tt.id), tt);
     });
@@ -332,13 +309,6 @@ export function subscribeToRealtimeCloud(
     }
   }, (err) => console.warn('Subjects realtime sub note:', err));
 
-  const unsubRooms = onSnapshot(collection(db, 'rooms'), (snap) => {
-    if (!snap.empty) {
-      const rooms = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Room));
-      onUpdate({ rooms });
-    }
-  }, (err) => console.warn('Rooms realtime sub note:', err));
-
   const unsubAbsences = onSnapshot(collection(db, 'absences'), (snap) => {
     const absences = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Absence));
     onUpdate({ absences });
@@ -354,7 +324,6 @@ export function subscribeToRealtimeCloud(
     unsubTeachers();
     unsubClasses();
     unsubSubjects();
-    unsubRooms();
     unsubAbsences();
     unsubSubstitutions();
   };
@@ -365,7 +334,6 @@ export async function seedDatabase(dataToSeed?: AppDataState): Promise<void> {
     teachers: INITIAL_TEACHERS,
     classes: INITIAL_CLASSES,
     subjects: INITIAL_SUBJECTS,
-    rooms: INITIAL_ROOMS,
     timetables: INITIAL_TIMETABLE,
     absences: INITIAL_ABSENCES,
     substitutions: INITIAL_SUBSTITUTIONS
