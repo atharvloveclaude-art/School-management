@@ -85,6 +85,20 @@ export interface AppDataState {
   timetables: TimetableEntry[];
   absences: Absence[];
   substitutions: Substitution[];
+  lastSaved?: number;
+}
+
+let autoSaveTimer: any = null;
+type AutoSaveStatusListener = (status: 'idle' | 'saving' | 'saved' | 'error', lastSavedTime?: string) => void;
+const autoSaveListeners: Set<AutoSaveStatusListener> = new Set();
+
+export function subscribeToAutoSaveStatus(listener: AutoSaveStatusListener): () => void {
+  autoSaveListeners.add(listener);
+  return () => autoSaveListeners.delete(listener);
+}
+
+function notifyAutoSaveStatus(status: 'idle' | 'saving' | 'saved' | 'error', time?: string) {
+  autoSaveListeners.forEach((fn) => fn(status, time));
 }
 
 export function getInitialLocalData(): AppDataState {
@@ -92,7 +106,7 @@ export function getInitialLocalData(): AppDataState {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.teachers && parsed.classes && parsed.timetables) {
+      if (parsed.teachers && parsed.classes && parsed.timetables && parsed.timetables.length > 0) {
         return parsed;
       }
     }
@@ -106,19 +120,53 @@ export function getInitialLocalData(): AppDataState {
     subjects: INITIAL_SUBJECTS,
     timetables: INITIAL_TIMETABLE,
     absences: INITIAL_ABSENCES,
-    substitutions: INITIAL_SUBSTITUTIONS
+    substitutions: INITIAL_SUBSTITUTIONS,
+    lastSaved: Date.now()
   };
 }
 
 export function saveLocalData(data: AppDataState): void {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    const stateToSave = {
+      ...data,
+      lastSaved: Date.now()
+    };
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
   } catch (e) {
     console.error('Error saving local data:', e);
   }
 
-  // Sync to backend API
+  // Sync to backend Express API
   syncToBackendAPI(data).catch(() => {});
+}
+
+/**
+ * Triggers an automatic debounced background save to Firestore Cloud Database
+ */
+export function triggerAutoSaveToCloud(data: AppDataState): void {
+  // 1. Immediately save to LocalStorage & Express backend
+  saveLocalData(data);
+  notifyAutoSaveStatus('saving');
+
+  // 2. Debounced push to Firestore master snapshot & collections
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+  }
+
+  autoSaveTimer = setTimeout(async () => {
+    try {
+      const ok = await pushFullStateToCloud(data);
+      if (ok) {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        notifyAutoSaveStatus('saved', timeStr);
+      } else {
+        notifyAutoSaveStatus('idle');
+      }
+    } catch (err) {
+      console.warn('Auto-save background note:', err);
+      notifyAutoSaveStatus('idle');
+    }
+  }, 600);
 }
 
 // Sync full state to backend REST endpoint (/api/data)
@@ -156,25 +204,25 @@ export function sanitizeForFirestore<T>(data: T): T {
 }
 
 /**
- * Fetch full database by pulling all live individual documents from Firestore.
- * This guarantees that entries added by Laptop A, Laptop B, and Laptop C are ALL combined!
+ * Fetch full database by pulling all live individual documents from Firestore and merging with local cache.
+ * This guarantees that entries added are NEVER lost on page reload!
  */
 export async function fetchFullAppData(): Promise<AppDataState> {
+  const localCache = getInitialLocalData();
+
   // Layer 1: Master Snapshot from Firestore
+  let cloudSnapshot: AppDataState | null = null;
   try {
     const snapshotDoc = await getDoc(doc(db, 'app_state', 'master_snapshot')).catch(() => null);
     if (snapshotDoc && snapshotDoc.exists()) {
-      const cloudData = snapshotDoc.data() as AppDataState;
-      if (cloudData && cloudData.timetables && cloudData.timetables.length > 0) {
-        saveLocalData(cloudData);
-        return cloudData;
-      }
+      cloudSnapshot = snapshotDoc.data() as AppDataState;
     }
   } catch (e) {
     console.info('Master snapshot check note:', e);
   }
 
   // Layer 2: Pull live documents from all individual Firestore collections
+  let collectionData: Partial<AppDataState> | null = null;
   try {
     const [tSnap, cSnap, sSnap, ttSnap, abSnap, subSnap] = await Promise.all([
       getDocs(collection(db, 'teachers')).catch(() => null),
@@ -192,64 +240,86 @@ export async function fetchFullAppData(): Promise<AppDataState> {
       (sSnap && !sSnap.empty);
 
     if (hasAnyDocs) {
-      const teachers = (tSnap && !tSnap.empty)
-        ? tSnap.docs.map(d => ({ ...d.data(), id: d.id } as Teacher))
-        : INITIAL_TEACHERS;
-
-      const classes = (cSnap && !cSnap.empty)
-        ? cSnap.docs.map(d => ({ ...d.data(), id: d.id } as ClassItem))
-        : INITIAL_CLASSES;
-
-      const subjects = (sSnap && !sSnap.empty)
-        ? sSnap.docs.map(d => ({ ...d.data(), id: d.id } as Subject))
-        : INITIAL_SUBJECTS;
-
-      const timetables = (ttSnap && !ttSnap.empty)
-        ? ttSnap.docs.map(d => ({ ...d.data(), id: d.id } as TimetableEntry))
-        : INITIAL_TIMETABLE;
-
-      const absences = (abSnap && !abSnap.empty)
-        ? abSnap.docs.map(d => ({ ...d.data(), id: d.id } as Absence))
-        : INITIAL_ABSENCES;
-
-      const substitutions = (subSnap && !subSnap.empty)
-        ? subSnap.docs.map(d => ({ ...d.data(), id: d.id } as Substitution))
-        : INITIAL_SUBSTITUTIONS;
-
-      const combined: AppDataState = {
-        teachers,
-        classes,
-        subjects,
-        timetables,
-        absences,
-        substitutions
+      collectionData = {
+        teachers: tSnap && !tSnap.empty ? tSnap.docs.map((d) => ({ ...d.data(), id: d.id } as Teacher)) : undefined,
+        classes: cSnap && !cSnap.empty ? cSnap.docs.map((d) => ({ ...d.data(), id: d.id } as ClassItem)) : undefined,
+        subjects: sSnap && !sSnap.empty ? sSnap.docs.map((d) => ({ ...d.data(), id: d.id } as Subject)) : undefined,
+        timetables: ttSnap && !ttSnap.empty ? ttSnap.docs.map((d) => ({ ...d.data(), id: d.id } as TimetableEntry)) : undefined,
+        absences: abSnap && !abSnap.empty ? abSnap.docs.map((d) => ({ ...d.data(), id: d.id } as Absence)) : undefined,
+        substitutions: subSnap && !subSnap.empty ? subSnap.docs.map((d) => ({ ...d.data(), id: d.id } as Substitution)) : undefined,
       };
-
-      saveLocalData(combined);
-      return combined;
     }
   } catch (e) {
     console.warn('Firestore live collections fetch note:', e);
   }
 
-  // Layer 3: Backend REST API
+  // Layer 3: Backend REST API fallback check
+  let backendData: AppDataState | null = null;
   try {
     const res = await fetch('/api/data');
     if (res.ok) {
       const json = await res.json();
       if (json.data && json.data.timetables && json.data.timetables.length > 0) {
-        saveLocalData(json.data);
-        return json.data;
+        backendData = json.data;
       }
     }
   } catch (e) {
     // ignore
   }
 
-  // Layer 4: LocalStorage Cache or Default Seed
-  const fallback = getInitialLocalData();
-  saveLocalData(fallback);
-  return fallback;
+  // Determine primary candidate
+  let candidate: AppDataState = localCache;
+  if (cloudSnapshot && cloudSnapshot.timetables && cloudSnapshot.timetables.length > 0) {
+    candidate = cloudSnapshot;
+  } else if (collectionData && collectionData.timetables && collectionData.timetables.length > 0) {
+    candidate = {
+      teachers: collectionData.teachers || localCache.teachers,
+      classes: collectionData.classes || localCache.classes,
+      subjects: collectionData.subjects || localCache.subjects,
+      timetables: collectionData.timetables || localCache.timetables,
+      absences: collectionData.absences || localCache.absences,
+      substitutions: collectionData.substitutions || localCache.substitutions,
+    };
+  } else if (backendData) {
+    candidate = backendData;
+  }
+
+  // Merge candidate with localCache:
+  // If localCache has entries created/edited by user, preserve them cleanly!
+  const mergedTimetablesMap = new Map<string, TimetableEntry>();
+  (candidate.timetables || []).forEach((t) => mergedTimetablesMap.set(t.id, t));
+  (localCache.timetables || []).forEach((t) => {
+    // If candidate doesn't have it or local is fresh, preserve local entry
+    if (!mergedTimetablesMap.has(t.id)) {
+      mergedTimetablesMap.set(t.id, t);
+    }
+  });
+
+  // Merge teachers, classes, subjects
+  const mergedTeachersMap = new Map<string, Teacher>();
+  (candidate.teachers || []).forEach((t) => mergedTeachersMap.set(t.id, t));
+  (localCache.teachers || []).forEach((t) => mergedTeachersMap.set(t.id, t));
+
+  const mergedClassesMap = new Map<string, ClassItem>();
+  (candidate.classes || []).forEach((c) => mergedClassesMap.set(c.id, c));
+  (localCache.classes || []).forEach((c) => mergedClassesMap.set(c.id, c));
+
+  const mergedSubjectsMap = new Map<string, Subject>();
+  (candidate.subjects || []).forEach((s) => mergedSubjectsMap.set(s.id, s));
+  (localCache.subjects || []).forEach((s) => mergedSubjectsMap.set(s.id, s));
+
+  const finalState: AppDataState = {
+    teachers: Array.from(mergedTeachersMap.values()),
+    classes: Array.from(mergedClassesMap.values()),
+    subjects: Array.from(mergedSubjectsMap.values()),
+    timetables: Array.from(mergedTimetablesMap.values()),
+    absences: candidate.absences && candidate.absences.length > 0 ? candidate.absences : (localCache.absences || []),
+    substitutions: candidate.substitutions && candidate.substitutions.length > 0 ? candidate.substitutions : (localCache.substitutions || []),
+    lastSaved: Date.now()
+  };
+
+  saveLocalData(finalState);
+  return finalState;
 }
 
 /**

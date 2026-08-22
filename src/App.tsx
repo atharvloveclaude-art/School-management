@@ -15,6 +15,8 @@ import {
   saveLocalData,
   getInitialLocalData,
   pushFullStateToCloud,
+  triggerAutoSaveToCloud,
+  subscribeToAutoSaveStatus,
   subscribeToRealtimeCloud,
   syncDocToFirestore,
   deleteDocFromFirestore,
@@ -67,10 +69,22 @@ export default function App() {
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('T001');
   const [selectedClassId, setSelectedClassId] = useState<string>('12-A');
 
-  // Notifications
+  // Notifications & Auto-Save State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'info' | 'error'>('success');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('saved');
+  const [lastSavedTime, setLastSavedTime] = useState<string>(() =>
+    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  );
+
+  useEffect(() => {
+    const unsub = subscribeToAutoSaveStatus((status, time) => {
+      setAutoSaveStatus(status);
+      if (time) setLastSavedTime(time);
+    });
+    return unsub;
+  }, []);
 
   // Initialize data on mount & subscribe to real-time updates across multiple laptops
   useEffect(() => {
@@ -214,7 +228,8 @@ export default function App() {
       subjects: changes.subjects || subjects,
       timetables: changes.timetables || timetables,
       absences: changes.absences || absences,
-      substitutions: changes.substitutions || substitutions
+      substitutions: changes.substitutions || substitutions,
+      lastSaved: Date.now()
     };
 
     if (changes.teachers) setTeachers(changes.teachers);
@@ -224,7 +239,7 @@ export default function App() {
     if (changes.absences) setAbsences(changes.absences);
     if (changes.substitutions) setSubstitutions(changes.substitutions);
 
-    saveLocalData(nextState);
+    triggerAutoSaveToCloud(nextState);
   };
 
   // Reset to default 8-period seed dataset
@@ -653,6 +668,8 @@ export default function App() {
         onToggleAnonymous={handleToggleAnonymous}
         onOpenPrintModal={() => handleOpenPrintRoster('2026-08-17')}
         isSyncing={isSyncing}
+        autoSaveStatus={autoSaveStatus}
+        lastSavedTime={lastSavedTime}
         onPushToCloud={handlePushActiveTabToCloud}
         onRefreshFromCloud={handleRefreshFromCloud}
       />

@@ -421,32 +421,40 @@ export const TimetableModal: React.FC<TimetableModalProps> = ({
             </div>
 
             {/* Modal Actions */}
-            <div className="modal-footer" style={{ paddingLeft: 0, paddingRight: 0, paddingBottom: 0, marginTop: '20px' }}>
-              {entry.id && onDelete && (
-                <button
-                  type="button"
-                  className="btn btn-danger btn-sm"
-                  style={{ marginRight: 'auto' }}
-                  onClick={() => onDelete(entry.id!)}
-                >
-                  Delete Entry
+            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ fontSize: '11.5px', color: '#166534', background: '#dcfce7', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span>⚡</span> Auto-saves directly to Cloud & Local Storage
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                {entry.id && onDelete && (
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    onClick={() => onDelete(entry.id!)}
+                  >
+                    Delete Entry
+                  </button>
+                )}
+                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                  Cancel
                 </button>
-              )}
-              <button type="button" className="btn btn-secondary" onClick={onClose}>
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={conflictResult.hasConflict}
-                style={{
-                  backgroundColor: conflictResult.hasConflict ? '#94a3b8' : '#2563eb',
-                  cursor: conflictResult.hasConflict ? 'not-allowed' : 'pointer',
-                  fontWeight: 700
-                }}
-              >
-                {conflictResult.hasConflict ? '⛔ Double-Booking Blocked' : 'Save Timetable Entry'}
-              </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={conflictResult.hasConflict}
+                  style={{
+                    backgroundColor: conflictResult.hasConflict ? '#94a3b8' : '#2563eb',
+                    cursor: conflictResult.hasConflict ? 'not-allowed' : 'pointer',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {conflictResult.hasConflict ? '⛔ Double-Booking Blocked' : '💾 Save & Auto-Sync Entry'}
+                </button>
+              </div>
             </div>
           </form>
         </div>

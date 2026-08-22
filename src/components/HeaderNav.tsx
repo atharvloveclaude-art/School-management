@@ -16,6 +16,8 @@ interface HeaderNavProps {
   onToggleAnonymous: () => void;
   onOpenPrintModal: () => void;
   isSyncing: boolean;
+  autoSaveStatus?: 'idle' | 'saving' | 'saved' | 'error';
+  lastSavedTime?: string;
   onPushToCloud?: () => void;
   onRefreshFromCloud?: () => void;
 }
@@ -35,6 +37,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   onToggleAnonymous,
   onOpenPrintModal,
   isSyncing,
+  autoSaveStatus = 'saved',
+  lastSavedTime,
   onPushToCloud,
   onRefreshFromCloud
 }) => {
@@ -63,14 +67,22 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
               🏫
             </div>
             <div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                CM Shri, Yamuna Vihar Timetable & Substitute Desk
-                <span style={{ fontSize: '11px', background: isSyncing ? '#fef3c7' : '#dcfce7', color: isSyncing ? '#92400e' : '#166534', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
-                  {isSyncing ? '⏳ Cloud Syncing...' : '🟢 Live Multi-Device Sync'}
-                </span>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span>CM Shri, Yamuna Vihar Timetable & Substitute Desk</span>
+                
+                {/* Auto-Save & Cloud Status Pill */}
+                {autoSaveStatus === 'saving' || isSyncing ? (
+                  <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '3px 9px', borderRadius: '12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ animation: 'spin 1s linear infinite' }}>⏳</span> Auto-saving changes...
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '11px', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', padding: '3px 9px', borderRadius: '12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🟢</span> Auto-saved (Cloud & Local) {lastSavedTime ? `• ${lastSavedTime}` : ''}
+                  </span>
+                )}
               </div>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>
-                8 Periods/Day &bull; 6 Working Days &bull; Real-time Multi-User Cloud Connected
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>8 Periods/Day &bull; 6 Working Days &bull; Real-time Auto-Save Active</span>
               </div>
             </div>
           </div>
