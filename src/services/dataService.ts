@@ -135,12 +135,46 @@ export async function syncToBackendAPI(data: AppDataState): Promise<boolean> {
   }
 }
 
+// Recursively strips undefined keys and nested undefined values for Firestore compatibility
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as unknown as T;
+  }
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && data !== null) {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned;
+  }
+  return data;
+}
+
 /**
  * Fetch full database by pulling all live individual documents from Firestore.
  * This guarantees that entries added by Laptop A, Laptop B, and Laptop C are ALL combined!
  */
 export async function fetchFullAppData(): Promise<AppDataState> {
-  // Layer 1: Pull live documents from all individual Firestore collections
+  // Layer 1: Master Snapshot from Firestore
+  try {
+    const snapshotDoc = await getDoc(doc(db, 'app_state', 'master_snapshot')).catch(() => null);
+    if (snapshotDoc && snapshotDoc.exists()) {
+      const cloudData = snapshotDoc.data() as AppDataState;
+      if (cloudData && cloudData.timetables && cloudData.timetables.length > 0) {
+        saveLocalData(cloudData);
+        return cloudData;
+      }
+    }
+  } catch (e) {
+    console.info('Master snapshot check note:', e);
+  }
+
+  // Layer 2: Pull live documents from all individual Firestore collections
   try {
     const [tSnap, cSnap, sSnap, ttSnap, abSnap, subSnap] = await Promise.all([
       getDocs(collection(db, 'teachers')).catch(() => null),
@@ -198,20 +232,6 @@ export async function fetchFullAppData(): Promise<AppDataState> {
     console.warn('Firestore live collections fetch note:', e);
   }
 
-  // Layer 2: Master Snapshot fallback
-  try {
-    const snapshotDoc = await getDoc(doc(db, 'app_state', 'master_snapshot'));
-    if (snapshotDoc.exists()) {
-      const cloudData = snapshotDoc.data() as AppDataState;
-      if (cloudData && cloudData.teachers && cloudData.timetables && cloudData.timetables.length > 0) {
-        saveLocalData(cloudData);
-        return cloudData;
-      }
-    }
-  } catch (e) {
-    console.info('Master snapshot check note:', e);
-  }
-
   // Layer 3: Backend REST API
   try {
     const res = await fetch('/api/data');
@@ -240,33 +260,38 @@ export async function pushFullStateToCloud(data: AppDataState): Promise<boolean>
   try {
     saveLocalData(data);
 
-    // 1. Write batch for collections (up to 500 ops per batch)
-    const batch = writeBatch(db);
+    // Sanitize state data so Firestore never receives undefined properties
+    const sanitized = sanitizeForFirestore(data);
 
-    data.teachers.forEach((t) => {
-      batch.set(doc(db, 'teachers', t.id), t);
-    });
-    data.classes.forEach((c) => {
-      batch.set(doc(db, 'classes', c.id), c);
-    });
-    data.subjects.forEach((s) => {
-      batch.set(doc(db, 'subjects', s.id), s);
-    });
-    data.timetables.forEach((tt) => {
-      batch.set(doc(db, 'timetables', tt.id), tt);
-    });
-    data.absences.forEach((ab) => {
-      batch.set(doc(db, 'absences', ab.id), ab);
-    });
-    data.substitutions.forEach((sub) => {
-      batch.set(doc(db, 'substitutions', sub.id), sub);
-    });
+    // 1. Update master snapshot doc first
+    try {
+      await setDoc(doc(db, 'app_state', 'master_snapshot'), sanitized);
+    } catch (snapErr) {
+      console.warn('Master snapshot update note:', snapErr);
+    }
 
-    // Also update snapshot
-    batch.set(doc(db, 'app_state', 'master_snapshot'), data);
+    // 2. Queue all individual document operations
+    const operations: { coll: string; id: string; docData: any }[] = [];
 
-    await batch.commit();
-    await syncToBackendAPI(data);
+    sanitized.teachers.forEach((t) => operations.push({ coll: 'teachers', id: t.id, docData: t }));
+    sanitized.classes.forEach((c) => operations.push({ coll: 'classes', id: c.id, docData: c }));
+    sanitized.subjects.forEach((s) => operations.push({ coll: 'subjects', id: s.id, docData: s }));
+    sanitized.timetables.forEach((tt) => operations.push({ coll: 'timetables', id: tt.id, docData: tt }));
+    sanitized.absences.forEach((ab) => operations.push({ coll: 'absences', id: ab.id, docData: ab }));
+    sanitized.substitutions.forEach((sub) => operations.push({ coll: 'substitutions', id: sub.id, docData: sub }));
+
+    // Chunk into batches of up to 400 operations (under the 500 Firestore limit)
+    const CHUNK_SIZE = 400;
+    for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+      const chunk = operations.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((op) => {
+        batch.set(doc(db, op.coll, op.id), op.docData);
+      });
+      await batch.commit();
+    }
+
+    await syncToBackendAPI(sanitized);
     return true;
   } catch (e) {
     console.error('Error pushing full state to cloud:', e);
@@ -344,7 +369,8 @@ export async function seedDatabase(dataToSeed?: AppDataState): Promise<void> {
 
 export async function syncDocToFirestore(collName: string, id: string, data: any): Promise<void> {
   try {
-    await setDoc(doc(db, collName, id), data);
+    const sanitized = sanitizeForFirestore(data);
+    await setDoc(doc(db, collName, id), sanitized);
   } catch (e) {
     console.warn(`Firestore sync note for ${collName}/${id}:`, e);
   }

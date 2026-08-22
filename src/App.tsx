@@ -4,7 +4,6 @@ import {
   Teacher,
   ClassItem,
   Subject,
-  Room,
   TimetableEntry,
   Absence,
   Substitution,
@@ -14,6 +13,7 @@ import {
   fetchFullAppData,
   seedDatabase,
   saveLocalData,
+  getInitialLocalData,
   pushFullStateToCloud,
   subscribeToRealtimeCloud,
   syncDocToFirestore,
@@ -54,14 +54,14 @@ export default function App() {
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState<boolean>(false);
   const [activeAssignSub, setActiveAssignSub] = useState<Substitution | null>(null);
 
-  // Core App Data
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [timetables, setTimetables] = useState<TimetableEntry[]>([]);
-  const [absences, setAbsences] = useState<Absence[]>([]);
-  const [substitutions, setSubstitutions] = useState<Substitution[]>([]);
+  // Core App Data (instant local cache initialization)
+  const initialData = getInitialLocalData();
+  const [teachers, setTeachers] = useState<Teacher[]>(() => initialData.teachers || []);
+  const [classes, setClasses] = useState<ClassItem[]>(() => initialData.classes || []);
+  const [subjects, setSubjects] = useState<Subject[]>(() => initialData.subjects || []);
+  const [timetables, setTimetables] = useState<TimetableEntry[]>(() => initialData.timetables || []);
+  const [absences, setAbsences] = useState<Absence[]>(() => initialData.absences || []);
+  const [substitutions, setSubstitutions] = useState<Substitution[]>(() => initialData.substitutions || []);
 
   // Selected for teacher/student portals
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('T001');
@@ -109,7 +109,6 @@ export default function App() {
           setTeachers(currentTeachers);
           setClasses(fullData.classes);
           setSubjects(fullData.subjects);
-          setRooms(fullData.rooms);
           setTimetables(cleanTimetables);
           setAbsences(cleanAbsences);
           setSubstitutions(cleanSubs);
@@ -134,7 +133,6 @@ export default function App() {
       if (changes.teachers && changes.teachers.length > 0) setTeachers(changes.teachers);
       if (changes.classes && changes.classes.length > 0) setClasses(changes.classes);
       if (changes.subjects && changes.subjects.length > 0) setSubjects(changes.subjects);
-      if (changes.rooms && changes.rooms.length > 0) setRooms(changes.rooms);
       if (changes.absences) {
         setTeachers((latestTeachers) => {
           const { cleaned } = deduplicateAbsences(changes.absences || [], latestTeachers);
@@ -172,7 +170,6 @@ export default function App() {
       teachers,
       classes,
       subjects,
-      rooms,
       timetables,
       absences,
       substitutions
@@ -196,7 +193,6 @@ export default function App() {
     setTeachers(freshData.teachers);
     setClasses(freshData.classes);
     setSubjects(freshData.subjects);
-    setRooms(freshData.rooms);
     setTimetables(freshData.timetables);
     setAbsences(freshData.absences);
     setSubstitutions(freshData.substitutions);
@@ -216,7 +212,6 @@ export default function App() {
       teachers: changes.teachers || teachers,
       classes: changes.classes || classes,
       subjects: changes.subjects || subjects,
-      rooms: changes.rooms || rooms,
       timetables: changes.timetables || timetables,
       absences: changes.absences || absences,
       substitutions: changes.substitutions || substitutions
@@ -225,7 +220,6 @@ export default function App() {
     if (changes.teachers) setTeachers(changes.teachers);
     if (changes.classes) setClasses(changes.classes);
     if (changes.subjects) setSubjects(changes.subjects);
-    if (changes.rooms) setRooms(changes.rooms);
     if (changes.timetables) setTimetables(changes.timetables);
     if (changes.absences) setAbsences(changes.absences);
     if (changes.substitutions) setSubstitutions(changes.substitutions);
@@ -242,7 +236,6 @@ export default function App() {
       setTeachers(freshData.teachers);
       setClasses(freshData.classes);
       setSubjects(freshData.subjects);
-      setRooms(freshData.rooms);
       setTimetables(freshData.timetables);
       setAbsences(freshData.absences);
       setSubstitutions(freshData.substitutions);
@@ -304,7 +297,6 @@ export default function App() {
       teachers,
       classes,
       subjects,
-      rooms,
       timetables: cleaned,
       absences,
       substitutions
@@ -335,7 +327,6 @@ export default function App() {
       teachers: fullData.teachers || teachers,
       classes: fullData.classes || classes,
       subjects: fullData.subjects || subjects,
-      rooms: fullData.rooms || rooms,
       timetables: fullData.timetables || timetables
     });
     seedDatabase(fullData);
@@ -408,28 +399,6 @@ export default function App() {
     showToast('Subject deleted.');
   };
 
-  // Room CRUD
-  const handleSaveRoom = (room: Room) => {
-    const existing = rooms.findIndex((r) => r.id === room.id);
-    let updated: Room[];
-    if (existing >= 0) {
-      updated = [...rooms];
-      updated[existing] = room;
-    } else {
-      updated = [...rooms, room];
-    }
-    updateAppData({ rooms: updated });
-    syncDocToFirestore('rooms', room.id, room);
-    showToast(`Room ${room.id} saved.`);
-  };
-
-  const handleDeleteRoom = (id: string) => {
-    const updated = rooms.filter((r) => r.id !== id);
-    updateAppData({ rooms: updated });
-    deleteDocFromFirestore('rooms', id);
-    showToast('Room deleted.');
-  };
-
   // Single Absence & Substitute Creation
   const handleMarkAbsent = (
     teacherId: string,
@@ -481,7 +450,6 @@ export default function App() {
         subjectName: ap.subjectName,
         originalTeacherId: teacherId,
         originalTeacherName: teacherName,
-        roomId: ap.roomId,
         batch: ap.batch,
         frequency: ap.frequency,
         status: 'Pending'
@@ -722,7 +690,6 @@ export default function App() {
                 teachers={teachers}
                 classes={classes}
                 subjects={subjects}
-                rooms={rooms}
                 isAnonymous={isAnonymous}
                 onCleanDuplicates={handleCleanDuplicateConflicts}
                 onCellClick={(entry) => {
@@ -743,7 +710,6 @@ export default function App() {
               teachers={teachers}
               classes={classes}
               subjects={subjects}
-              rooms={rooms}
               timetables={timetables}
               isAnonymous={isAnonymous}
               onSaveTeacher={handleSaveTeacher}
@@ -752,8 +718,6 @@ export default function App() {
               onDeleteClass={handleDeleteClass}
               onSaveSubject={handleSaveSubject}
               onDeleteSubject={handleDeleteSubject}
-              onSaveRoom={handleSaveRoom}
-              onDeleteRoom={handleDeleteRoom}
               onImportTeachers={handleImportTeachers}
               onImportTimetable={handleImportTimetable}
               onImportFullSetup={handleImportFullSetup}
@@ -812,7 +776,6 @@ export default function App() {
           teachers={teachers}
           classes={classes}
           subjects={subjects}
-          rooms={rooms}
           isAnonymous={isAnonymous}
           onSave={handleSaveTimetableEntry}
           onDelete={handleDeleteTimetableEntry}
